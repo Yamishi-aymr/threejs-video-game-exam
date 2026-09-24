@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta
+        name="description"
+        content="Operación Reactor - Videojuego Web 3D desarrollado con Three.js y Rapier 3D"
+    >
+
+    <title>Operación: Reactor</title>
+
+    <link
+        rel="icon"
+        type="image/png"
+        href="./assets/images/favicon.png"
+    >
+
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+    >
+
+
+    <link
+        rel="stylesheet"
+        href="./assets/css/styles.css"
+    >
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/"
+        }
+    }
+    </script>
+
+</head>
+
+<body>
+
+    <main id="scene-container"></main>
+
+    <section
+        id="game-info"
+        class="game-info"
+    >
+
+        <div class="game-brand">
+
+            <span class="game-status"></span>
+
+            <div>
+
+                <h1>
+                    OPERACIÓN:
+                    <span>REACTOR</span>
+                </h1>
+
+                <p>
+                    Sistema de simulación iniciado
+                </p>
+
+            </div>
+
+        </div>
+
+    </section>
+
+    <section
+        id="hud"
+        class="hud"
+    >
+
+        <div class="hud-item">
+
+            <span class="hud-label">
+                ESTADO
+            </span>
+
+            <span
+                id="game-state"
+                class="hud-value"
+            >
+                PREPARANDO
+            </span>
+
+        </div>
+
+
+        <div class="hud-divider"></div>
+
+
+        <div class="hud-item">
+
+            <span class="hud-label">
+                NÚCLEOS
+            </span>
+
+            <span
+                id="core-counter"
+                class="hud-value"
+            >
+                0 / 5
+            </span>
+
+        </div>
+
+
+        <div class="hud-divider"></div>
+
+
+        <div class="hud-item">
+
+            <span class="hud-label">
+                TIEMPO
+            </span>
+
+            <span
+                id="timer"
+                class="hud-value"
+            >
+                03:00
+            </span>
+
+        </div>
+
+    </section>
+    
+    <section class="controls-panel">
+
+        <span>
+
+            <kbd>W</kbd>
+            <kbd>A</kbd>
+            <kbd>S</kbd>
+            <kbd>D</kbd>
+
+            Mover
+
+        </span>
+
+
+        <span>
+
+            <kbd>SHIFT</kbd>
+
+            Correr
+
+        </span>
+
+
+        <span>
+
+            <kbd>MOUSE</kbd>
+
+            Cámara
+
+        </span>
+
+
+        <span>
+
+            <kbd>CLICK</kbd>
+
+            Disparar
+
+        </span>
+
+    </section>
+
+    <div
+        id="crosshair"
+        class="crosshair"
+        aria-hidden="true"
+    >
+
+        <span></span>
+        <span></span>
+
+    </div>
+
+    <footer class="game-footer">
+
+        <p>
+            Desarrollado por
+            <strong>Alicia Yamileth Mariano Reséndiz</strong>
+        </p>
+
+        <span>
+            Tecnologías de la Información y Comunicaciones
+        </span>
+
+    </footer>
+
+    <section
+        id="loading-screen"
+        class="loading-screen"
+    >
+
+        <div class="loading-content">
+
+            <div class="reactor-icon">
+
+                <div class="reactor-core"></div>
+
+            </div>
+
+
+            <p class="system-label">
+                SISTEMA DE CONTENCIÓN
+            </p>
+
+
+            <h2>
+
+                OPERACIÓN:
+                <span>REACTOR</span>
+
+            </h2>
+
+
+            <p
+                id="loading-message"
+                class="loading-message"
+            >
+                Inicializando entorno 3D...
+            </p>
+
+
+            <div class="loading-bar">
+
+                <div
+                    id="loading-progress"
+                    class="loading-progress"
+                ></div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+    <script
+        type="module"
+        src="./assets/js/main.js"
+    ></script>
+
+</body>
+
+</html>
