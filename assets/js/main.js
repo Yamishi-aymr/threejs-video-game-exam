@@ -4,6 +4,11 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
+import {
+    loadPlayer,
+    updatePlayer
+} from './player.js';
+
 
 // ============================================================
 // ELEMENTOS HTML
@@ -238,6 +243,17 @@ let environment = null;
 
 let environmentBounds = null;
 
+// ============================================================
+// TEMPORIZADOR
+// ============================================================
+
+const timer =
+    new THREE.Timer();
+
+timer.connect(
+    document
+);
+
 
 // ============================================================
 // CARGAR ESCENARIO GLB
@@ -315,12 +331,7 @@ function loadEnvironment() {
                                 object.name
                             );
                         }
-
-
-                        // =================================================
                         // CONFIGURACIÓN GENERAL
-                        // =================================================
-
                         object.castShadow = false;
 
                         object.receiveShadow = true;
@@ -403,6 +414,63 @@ function loadEnvironment() {
                 box.getCenter(
                     new THREE.Vector3()
                 );
+            // -----------------------------------------------
+            // CARGAR PERSONAJE
+            // -----------------------------------------------
+
+            const playerSpawn =
+                new THREE.Vector3(
+                    6.66,
+                    6.91,
+                    12.10
+                );
+
+            loadPlayer(
+                scene,
+                playerSpawn
+            )
+                .then(
+                    (player) => {
+
+                        console.log(
+                            '📍 Personaje colocado en:',
+                            player.position
+                        );
+
+
+                        // ---------------------------------------
+                        // CÁMARA TEMPORAL SOBRE EL PERSONAJE
+                        // ---------------------------------------
+
+                        camera.position.set(
+                            player.position.x + 5,
+                            player.position.y + 3,
+                            player.position.z + 7
+                        );
+
+
+                        controls.target.set(
+                            player.position.x,
+                            player.position.y + 1.2,
+                            player.position.z
+                        );
+
+
+                        controls.update();
+
+                    }
+                )
+                .catch(
+                    (error) => {
+
+                        console.error(
+                            '❌ No fue posible iniciar al personaje:',
+                            error
+                        );
+
+                    }
+                );
+
 
 
             // -----------------------------------------------
@@ -573,7 +641,6 @@ function loadEnvironment() {
 
 }
 
-
 // ============================================================
 // AJUSTAR CÁMARA AL ESCENARIO
 // ============================================================
@@ -697,8 +764,36 @@ function animate() {
     );
 
 
+    // ========================================================
+    // TIEMPO
+    // ========================================================
+
+    timer.update();
+
+
+    const deltaTime =
+        timer.getDelta();
+
+
+    // ========================================================
+    // PERSONAJE
+    // ========================================================
+
+    updatePlayer(
+        deltaTime
+    );
+
+
+    // ========================================================
+    // CÁMARA
+    // ========================================================
+
     controls.update();
 
+
+    // ========================================================
+    // RENDER
+    // ========================================================
 
     renderer.render(
         scene,
