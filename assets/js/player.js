@@ -2,6 +2,9 @@ import * as THREE from 'three';
 
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
+import {
+    movePlayerWithPhysics
+} from './physics.js';
 
 
 // VARIABLES DEL PERSONAJE
@@ -273,29 +276,14 @@ export function loadPlayer(
 
                     player =
                         gltf.scene;
-
-
-                    // -----------------------------------------------
                     // ORIENTACIÓN INICIAL
-                    // -----------------------------------------------
-
                     player.rotation.y =
                         Math.PI;
-
-
-                    // -----------------------------------------------
                     // POSICIÓN INICIAL
-                    // -----------------------------------------------
-
                     player.position.copy(
                         spawnPosition
                     );
-
-
-                    // -----------------------------------------------
                     // SOMBRAS
-                    // -----------------------------------------------
-
                     player.traverse(
                         (object) => {
 
@@ -313,36 +301,20 @@ export function loadPlayer(
 
                         }
                     );
-
-
-                    // -----------------------------------------------
                     // ANIMATION MIXER
-                    // -----------------------------------------------
-
                     mixer =
                         new THREE.AnimationMixer(
                             player
                         );
-
-
-                    // -----------------------------------------------
                     // REGISTRAR ANIMACIONES
-                    // -----------------------------------------------
-
                     gltf.animations.forEach(
                         (originalClip) => {
 
                             const clip =
                                 makeClipInPlace(
                                     originalClip
-                                );
-
-
-                            const animationName =
-                                clip.name.toLowerCase();
-
-
-                            if (
+                                ); const animationName =
+                                    clip.name.toLowerCase(); if (
                                 animationName.includes(
                                     'idle'
                                 )
@@ -353,10 +325,7 @@ export function loadPlayer(
                                         clip
                                     );
 
-                            }
-
-
-                            if (
+                            } if (
                                 animationName.includes(
                                     'walk'
                                 )
@@ -367,10 +336,7 @@ export function loadPlayer(
                                         clip
                                     );
 
-                            }
-
-
-                            if (
+                            } if (
                                 animationName.includes(
                                     'run'
                                 )
@@ -381,10 +347,7 @@ export function loadPlayer(
                                         clip
                                     );
 
-                            }
-
-
-                            if (
+                            } if (
                                 animationName.includes(
                                     'throw'
                                 )
@@ -393,13 +356,10 @@ export function loadPlayer(
                                 actions.Throw =
                                     mixer.clipAction(
                                         clip
+                                    ); actions.Throw.setLoop(
+                                        THREE.LoopOnce,
+                                        1
                                     );
-
-
-                                actions.Throw.setLoop(
-                                    THREE.LoopOnce,
-                                    1
-                                );
 
                                 actions.Throw.clampWhenFinished =
                                     true;
@@ -409,10 +369,8 @@ export function loadPlayer(
                         }
                     );
 
-                    // -----------------------------------------------
-                    // DETECTAR FIN DE ANIMACIÓN THROW
-                    // -----------------------------------------------
 
+                    // DETECTAR FIN DE ANIMACIÓN THROW
                     mixer.addEventListener(
                         'finished',
                         (event) => {
@@ -430,28 +388,16 @@ export function loadPlayer(
 
                         }
                     );
-                    // -----------------------------------------------
-                    // AGREGAR PERSONAJE
-                    // -----------------------------------------------
 
+                    // AGREGAR PERSONAJE
                     scene.add(
                         player
                     );
-
-
-                    // -----------------------------------------------
                     // ANIMACIÓN INICIAL
-                    // -----------------------------------------------
-
                     playAnimation(
                         'Idle'
                     );
-
-
-                    // -----------------------------------------------
                     // CONSOLA
-                    // -----------------------------------------------
-
                     console.log(
                         '✅ Personaje cargado correctamente'
                     );
@@ -497,12 +443,9 @@ export function loadPlayer(
                                     xhr.loaded /
                                     xhr.total
                                 ) * 100
+                            ); console.log(
+                                `👤 Cargando personaje: ${percent}%`
                             );
-
-
-                        console.log(
-                            `👤 Cargando personaje: ${percent}%`
-                        );
 
                     }
 
@@ -677,9 +620,9 @@ export function updatePlayer(
         return player;
 
     }
-    // ========================================================
+
     // ACCIÓN TEMPORAL BLOQUEADA
-    // ========================================================
+
 
     if (
         actionLocked
@@ -690,9 +633,9 @@ export function updatePlayer(
     }
 
 
-    // ========================================================
+
     // DIRECCIÓN DE LA CÁMARA
-    // ========================================================
+
 
     camera.getWorldDirection(
         cameraForward
@@ -714,9 +657,9 @@ export function updatePlayer(
     }
 
 
-    // ========================================================
+
     // VECTOR DERECHA DE LA CÁMARA
-    // ========================================================
+
 
     cameraRight.crossVectors(
         cameraForward,
@@ -734,9 +677,9 @@ export function updatePlayer(
     }
 
 
-    // ========================================================
+
     // CALCULAR MOVIMIENTO
-    // ========================================================
+
 
     moveDirection.set(
         0,
@@ -788,14 +731,15 @@ export function updatePlayer(
 
     }
 
+    let currentSpeed = 0;
 
     const isMoving =
         moveDirection.lengthSq() > 0;
 
 
-    // ========================================================
+
     // PERSONAJE EN MOVIMIENTO
-    // ========================================================
+
 
     if (
         isMoving
@@ -808,25 +752,13 @@ export function updatePlayer(
             keyStates.run;
 
 
-        const speed =
+        currentSpeed =
             isRunning
                 ? RUN_SPEED
                 : WALK_SPEED;
 
-
-        // -----------------------------------------------
-        // DESPLAZAMIENTO
-        // -----------------------------------------------
-
-        player.position.addScaledVector(
-            moveDirection,
-            speed * deltaTime
-        );
-
-
-        // -----------------------------------------------
         // ROTACIÓN DEL PERSONAJE
-        // -----------------------------------------------
+
 
         const targetRotation =
             Math.atan2(
@@ -862,51 +794,73 @@ export function updatePlayer(
         );
 
 
-        // -----------------------------------------------
+
         // ANIMACIÓN
-        // -----------------------------------------------
 
         if (
             isRunning
         ) {
-
             playAnimation(
                 'Run'
             );
-
         } else {
-
             playAnimation(
                 'Walk'
             );
-
         }
-
     }
-
-
-    // ========================================================
     // PERSONAJE QUIETO
-    // ========================================================
-
     else {
-
         playAnimation(
             'Idle'
         );
+    }
+    // ========================================================
+    // MOVIMIENTO CONTROLADO POR RAPIER
+    // ========================================================
+
+    const horizontalMovement =
+        new THREE.Vector3();
+
+
+    if (
+        isMoving
+    ) {
+
+        horizontalMovement
+            .copy(
+                moveDirection
+            )
+            .multiplyScalar(
+                currentSpeed *
+                deltaTime
+            );
 
     }
 
 
-    return player;
+    const physicsPosition =
+        movePlayerWithPhysics(
+            horizontalMovement,
+            deltaTime
+        );
 
+
+    if (
+        physicsPosition
+    ) {
+
+        player.position.set(
+            physicsPosition.x,
+            physicsPosition.y,
+            physicsPosition.z
+        );
+
+    }
+    return player;
 }
 
-
-
 // OBTENER PERSONAJE
-
-
 export function getPlayer() {
 
     return player;

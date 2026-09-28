@@ -9,10 +9,15 @@ import {
     updatePlayer
 } from './player.js';
 
+import {
+    initPhysics,
+    stepPhysics,
+    createEnvironmentCollider,
+    createPlayerPhysics
+} from './physics.js';
 
-  
 // ELEMENTOS HTML
-  
+
 
 const sceneContainer =
     document.getElementById('scene-container');
@@ -30,9 +35,9 @@ const gameStateElement =
     document.getElementById('game-state');
 
 
-  
+
 // ESCENA
-  
+
 
 const scene = new THREE.Scene();
 
@@ -47,9 +52,9 @@ scene.fog = new THREE.Fog(
 );
 
 
-  
+
 // CÁMARA
-  
+
 
 const camera = new THREE.PerspectiveCamera(
     60,
@@ -65,9 +70,9 @@ camera.position.set(
 );
 
 
-  
+
 // RENDERER
-  
+
 
 const renderer = new THREE.WebGLRenderer({
     antialias: true,
@@ -105,9 +110,9 @@ sceneContainer.appendChild(
 );
 
 
-  
+
 // CÁMARA / ORBIT CONTROLS
-  
+
 
 const controls = new OrbitControls(
     camera,
@@ -136,9 +141,9 @@ controls.target.set(
 );
 
 
-  
+
 // ILUMINACIÓN
-  
+
 
 // Luz ambiental general
 
@@ -235,17 +240,17 @@ scene.add(
 );
 
 
-  
+
 // ESCENARIO
-  
+
 
 let environment = null;
 
 let environmentBounds = null;
 
-  
+
 // TEMPORIZADOR
-  
+
 
 const timer =
     new THREE.Timer();
@@ -255,404 +260,293 @@ timer.connect(
 );
 
 
-  
+
 // CARGAR ESCENARIO GLB
-  
+
 
 function loadEnvironment() {
-
     loadingProgress.style.width =
-        '10%';
+        '10%'; loadingMessage.textContent =
+            'Cargando instalación...'; gameStateElement.textContent =
+                'CARGANDO'; const loader =
+                    new GLTFLoader(); loader.load('./assets/models/environment/kitchen_and_lab.glb',      // ====================================================
+                        // MODELO CARGADO
+                        (gltf) => {
+                            environment =
+                                gltf.scene;
+                            // CONFIGURACIÓN DE MALLAS
+                            let meshCount = 0; environment.traverse(
+                                (object) => {
+                                    if (
+                                        object.isMesh
+                                    ) {
+                                        meshCount++;    // =================================================
+                                        // OCULTAR PAREDES ROSAS DEL MODELO ORIGINAL
+                                        // =================================================
 
-    loadingMessage.textContent =
-        'Cargando instalación...';
+                                        if (
+                                            object.name.includes(
+                                                'WallCinematicaIntroduccion'
+                                            )
+                                        ) {
 
-    gameStateElement.textContent =
-        'CARGANDO';
+                                            object.visible = true;
 
+                                            object.material =
+                                                new THREE.MeshStandardMaterial({
+                                                    color: 0x70777a,
+                                                    roughness: 0.85,
+                                                    metalness: 0.05
+                                                });
 
-    const loader =
-        new GLTFLoader();
+                                            console.log(
+                                                '🎨 Material corregido:',
+                                                object.name
+                                            );
+                                        }
+                                        // CONFIGURACIÓN GENERAL
+                                        object.castShadow = false;
 
+                                        object.receiveShadow = true;
 
-    loader.load(
+                                        object.frustumCulled = true;
 
-        './assets/models/environment/kitchen_and_lab.glb',
+                                    }
 
+                                }
+                            );
+                            // CALCULAR LÍMITES DEL MODELO
+                            let box =
+                                new THREE.Box3()
+                                    .setFromObject(
+                                        environment
+                                    ); const center =
+                                        box.getCenter(
+                                            new THREE.Vector3()
+                                        );
+                            // CENTRAR ESCENARIO EN X Y Z
+                            environment.position.x -=
+                                center.x;
 
-        // ====================================================
-        // MODELO CARGADO
-        // ====================================================
+                            environment.position.z -=
+                                center.z;
+                            // COLOCAR EL PISO EN Y = 0
+                            environment.position.y -=
+                                box.min.y;
 
-        (gltf) => {
+                            // AGREGAR ESCENARIO
+                            scene.add(
+                                environment
+                            );
+                            // ACTUALIZAR MATRICES DEL ESCENARIO
 
-            environment =
-                gltf.scene;
+                            environment.updateMatrixWorld(
+                                true
+                            );
+                            // CREAR COLLIDER FÍSICO DEL ESCENARIO
 
+                            createEnvironmentCollider(
+                                environment
+                            );
+                            // RECALCULAR LÍMITES
+                            box =
+                                new THREE.Box3()
+                                    .setFromObject(
+                                        environment
+                                    ); environmentBounds =
+                                        box; const size =
+                                            box.getSize(
+                                                new THREE.Vector3()
+                                            ); const newCenter =
+                                                box.getCenter(
+                                                    new THREE.Vector3()
+                                                );
 
-            // -----------------------------------------------
-            // CONFIGURACIÓN DE MALLAS
-            // -----------------------------------------------
+                            // CARGAR PERSONAJE
+                            const playerSpawn =
+                                new THREE.Vector3(
+                                    6.66,
+                                    6.91,
+                                    12.10
+                                );
 
-            let meshCount = 0;
-
-
-            environment.traverse(
-                (object) => {
-
-                    if (
-                        object.isMesh
-                    ) {
-
-                        meshCount++;
-
-
-                        // =================================================
-                        // OCULTAR PAREDES ROSAS DEL MODELO ORIGINAL
-                        // =================================================
-
-                        if (
-                            object.name.includes(
-                                'WallCinematicaIntroduccion'
+                            loadPlayer(
+                                scene,
+                                playerSpawn
                             )
-                        ) {
+                                .then(
+                                    (player) => {
 
-                            object.visible = true;
+                                        console.log(
+                                            '📍 Personaje colocado en:',
+                                            player.position
+                                        );
+                                        // CREAR FÍSICA DEL PERSONAJE
 
-                            object.material =
-                                new THREE.MeshStandardMaterial({
-                                    color: 0x70777a,
-                                    roughness: 0.85,
-                                    metalness: 0.05
-                                });
+                                        createPlayerPhysics(
+                                            player.position
+                                        );
+                                        // CÁMARA EN TERCERA PERSONA
+
+
+                                        camera.position.set(
+                                            player.position.x,
+                                            player.position.y + 2.2,
+                                            player.position.z + 4.5
+                                        );
+
+                                        controls.target.set(
+                                            player.position.x,
+                                            player.position.y + 1.1,
+                                            player.position.z
+                                        );
+
+                                        // Evitar que la cámara se aleje demasiado
+                                        controls.minDistance = 2.5;
+                                        controls.maxDistance = 6;
+
+                                        // Evitar que pueda meterse demasiado debajo del personaje
+                                        controls.minPolarAngle = 0.35;
+                                        controls.maxPolarAngle = Math.PI / 2.05;
+
+                                        controls.update();
+                                    }
+                                )
+                                .catch(
+                                    (error) => {
+
+                                        console.error(
+                                            '❌ No fue posible iniciar al personaje:',
+                                            error
+                                        );
+
+                                    }
+                                );
+
+                            // AJUSTAR CÁMARA AUTOMÁTICAMENTE
+                            configureCameraForEnvironment(
+                                size,
+                                newCenter
+                            );
+                            // AJUSTAR NIEBLA
+                            const maxDimension =
+                                Math.max(
+                                    size.x,
+                                    size.y,
+                                    size.z
+                                ); scene.fog.near =
+                                    maxDimension * 0.8;
+
+                            scene.fog.far =
+                                maxDimension * 3;
+                            // AJUSTAR LUZ PRINCIPAL
+                            directionalLight.position.set(
+                                maxDimension * 0.4,
+                                maxDimension * 0.7,
+                                maxDimension * 0.4
+                            );
+                            // INFORMACIÓN EN CONSOLA
+                            console.log(
+                                '✅ Escenario cargado correctamente'
+                            );
 
                             console.log(
-                                '🎨 Material corregido:',
-                                object.name
+                                '📦 Modelo:',
+                                'kitchen_and_lab.glb'
                             );
+
+                            console.log(
+                                '🧩 Mallas encontradas:',
+                                meshCount
+                            );
+
+                            console.log(
+                                '📐 Tamaño del escenario:',
+                                {
+                                    ancho:
+                                        size.x.toFixed(2),
+
+                                    alto:
+                                        size.y.toFixed(2),
+
+                                    profundidad:
+                                        size.z.toFixed(2)
+                                }
+                            );
+                            // FINALIZAR CARGA
+                            loadingProgress.style.width =
+                                '100%';
+
+                            loadingMessage.textContent =
+                                'Instalación preparada';
+
+                            gameStateElement.textContent =
+                                'ESCENARIO LISTO'; setTimeout(
+                                    () => {
+
+                                        loadingScreen.classList.add(
+                                            'hidden'
+                                        );
+
+                                    },
+                                    500
+                                );
+
+                        },
+                        // PROGRESO DE CARGA
+
+
+                        (xhr) => {
+
+                            if (
+                                xhr.lengthComputable
+                            ) {
+
+                                const percent =
+                                    Math.round(
+                                        (
+                                            xhr.loaded /
+                                            xhr.total
+                                        ) * 100
+                                    ); loadingProgress.style.width =
+                                        `${percent}%`; loadingMessage.textContent =
+                                            `Cargando instalación... ${percent}%`;
+
+                            } else {
+
+                                loadingMessage.textContent =
+                                    'Cargando instalación...';
+
+                            }
+
+                        },
+                        // ERROR
+
+
+                        (error) => {
+
+                            console.error(
+                                '❌ Error cargando el escenario:',
+                                error
+                            ); loadingMessage.textContent =
+                                'Error al cargar el escenario';
+
+                            gameStateElement.textContent =
+                                'ERROR'; loadingProgress.style.width =
+                                    '100%';
+
+                            loadingProgress.style.background =
+                                '#ff445a';
+
                         }
-                        // CONFIGURACIÓN GENERAL
-                        object.castShadow = false;
 
-                        object.receiveShadow = true;
-
-                        object.frustumCulled = true;
-
-                    }
-
-                }
-            );
-
-
-            // -----------------------------------------------
-            // CALCULAR LÍMITES DEL MODELO
-            // -----------------------------------------------
-
-            let box =
-                new THREE.Box3()
-                    .setFromObject(
-                        environment
                     );
-
-
-            const center =
-                box.getCenter(
-                    new THREE.Vector3()
-                );
-
-
-            // -----------------------------------------------
-            // CENTRAR ESCENARIO EN X Y Z
-            // -----------------------------------------------
-
-            environment.position.x -=
-                center.x;
-
-            environment.position.z -=
-                center.z;
-
-
-            // -----------------------------------------------
-            // COLOCAR EL PISO EN Y = 0
-            // -----------------------------------------------
-
-            environment.position.y -=
-                box.min.y;
-
-
-            // -----------------------------------------------
-            // AGREGAR ESCENARIO
-            // -----------------------------------------------
-
-            scene.add(
-                environment
-            );
-
-
-            // -----------------------------------------------
-            // RECALCULAR LÍMITES
-            // -----------------------------------------------
-
-            box =
-                new THREE.Box3()
-                    .setFromObject(
-                        environment
-                    );
-
-
-            environmentBounds =
-                box;
-
-
-            const size =
-                box.getSize(
-                    new THREE.Vector3()
-                );
-
-
-            const newCenter =
-                box.getCenter(
-                    new THREE.Vector3()
-                );
-            // -----------------------------------------------
-            // CARGAR PERSONAJE
-            // -----------------------------------------------
-
-            const playerSpawn =
-                new THREE.Vector3(
-                    6.66,
-                    6.91,
-                    12.10
-                );
-
-            loadPlayer(
-                scene,
-                playerSpawn
-            )
-                .then(
-                    (player) => {
-
-                        console.log(
-                            '📍 Personaje colocado en:',
-                            player.position
-                        );
-
-
-                        // ---------------------------------------
-                        // CÁMARA TEMPORAL SOBRE EL PERSONAJE
-                        // ---------------------------------------
-
-                        // ---------------------------------------
-                        // CÁMARA EN TERCERA PERSONA
-                        // ---------------------------------------
-
-                        camera.position.set(
-                            player.position.x,
-                            player.position.y + 2.2,
-                            player.position.z + 4.5
-                        );
-
-                        controls.target.set(
-                            player.position.x,
-                            player.position.y + 1.1,
-                            player.position.z
-                        );
-
-                        // Evitar que la cámara se aleje demasiado
-                        controls.minDistance = 2.5;
-                        controls.maxDistance = 6;
-
-                        // Evitar que pueda meterse demasiado debajo del personaje
-                        controls.minPolarAngle = 0.35;
-                        controls.maxPolarAngle = Math.PI / 2.05;
-
-                        controls.update();
-                    }
-                )
-                .catch(
-                    (error) => {
-
-                        console.error(
-                            '❌ No fue posible iniciar al personaje:',
-                            error
-                        );
-
-                    }
-                );
-
-
-
-            // -----------------------------------------------
-            // AJUSTAR CÁMARA AUTOMÁTICAMENTE
-            // -----------------------------------------------
-
-            configureCameraForEnvironment(
-                size,
-                newCenter
-            );
-
-
-            // -----------------------------------------------
-            // AJUSTAR NIEBLA
-            // -----------------------------------------------
-
-            const maxDimension =
-                Math.max(
-                    size.x,
-                    size.y,
-                    size.z
-                );
-
-
-            scene.fog.near =
-                maxDimension * 0.8;
-
-            scene.fog.far =
-                maxDimension * 3;
-
-
-            // -----------------------------------------------
-            // AJUSTAR LUZ PRINCIPAL
-            // -----------------------------------------------
-
-            directionalLight.position.set(
-                maxDimension * 0.4,
-                maxDimension * 0.7,
-                maxDimension * 0.4
-            );
-
-
-            // -----------------------------------------------
-            // INFORMACIÓN EN CONSOLA
-            // -----------------------------------------------
-
-            console.log(
-                '✅ Escenario cargado correctamente'
-            );
-
-            console.log(
-                '📦 Modelo:',
-                'kitchen_and_lab.glb'
-            );
-
-            console.log(
-                '🧩 Mallas encontradas:',
-                meshCount
-            );
-
-            console.log(
-                '📐 Tamaño del escenario:',
-                {
-                    ancho:
-                        size.x.toFixed(2),
-
-                    alto:
-                        size.y.toFixed(2),
-
-                    profundidad:
-                        size.z.toFixed(2)
-                }
-            );
-
-
-            // -----------------------------------------------
-            // FINALIZAR CARGA
-            // -----------------------------------------------
-
-            loadingProgress.style.width =
-                '100%';
-
-            loadingMessage.textContent =
-                'Instalación preparada';
-
-            gameStateElement.textContent =
-                'ESCENARIO LISTO';
-
-
-            setTimeout(
-                () => {
-
-                    loadingScreen.classList.add(
-                        'hidden'
-                    );
-
-                },
-                500
-            );
-
-        },
-
-
-        // ====================================================
-        // PROGRESO DE CARGA
-        // ====================================================
-
-        (xhr) => {
-
-            if (
-                xhr.lengthComputable
-            ) {
-
-                const percent =
-                    Math.round(
-                        (
-                            xhr.loaded /
-                            xhr.total
-                        ) * 100
-                    );
-
-
-                loadingProgress.style.width =
-                    `${percent}%`;
-
-
-                loadingMessage.textContent =
-                    `Cargando instalación... ${percent}%`;
-
-            } else {
-
-                loadingMessage.textContent =
-                    'Cargando instalación...';
-
-            }
-
-        },
-
-
-        // ====================================================
-        // ERROR
-        // ====================================================
-
-        (error) => {
-
-            console.error(
-                '❌ Error cargando el escenario:',
-                error
-            );
-
-
-            loadingMessage.textContent =
-                'Error al cargar el escenario';
-
-            gameStateElement.textContent =
-                'ERROR';
-
-
-            loadingProgress.style.width =
-                '100%';
-
-            loadingProgress.style.background =
-                '#ff445a';
-
-        }
-
-    );
 
 }
 
-  
+
 // AJUSTAR CÁMARA AL ESCENARIO
-  
+
 
 function configureCameraForEnvironment(
     size,
@@ -664,10 +558,7 @@ function configureCameraForEnvironment(
             size.x,
             size.y,
             size.z
-        );
-
-
-    // Posición inicial elevada
+        );  // Posición inicial elevada
     // para poder revisar el escenario completo
 
     camera.position.set(
@@ -681,10 +572,7 @@ function configureCameraForEnvironment(
         center.z +
         maxDimension * 0.7
 
-    );
-
-
-    // La cámara mira aproximadamente
+    );  // La cámara mira aproximadamente
     // al centro del edificio
 
     controls.target.set(
@@ -698,60 +586,39 @@ function configureCameraForEnvironment(
 
         center.z
 
-    );
-
-
-    controls.minDistance =
+    ); controls.minDistance =
         2;
 
     controls.maxDistance =
-        maxDimension * 2;
-
-
-    camera.near =
-        0.1;
+        maxDimension * 2; camera.near =
+            0.1;
 
     camera.far =
         Math.max(
             500,
             maxDimension * 10
-        );
-
-
-    camera.updateProjectionMatrix();
-
-
-    controls.update();
+        ); camera.updateProjectionMatrix(); controls.update();
 
 }
 
 
-  
+
 // RESIZE
-  
+
 
 function handleResize() {
 
     camera.aspect =
         window.innerWidth /
-        window.innerHeight;
-
-
-    camera.updateProjectionMatrix();
-
-
-    renderer.setSize(
-        window.innerWidth,
-        window.innerHeight
-    );
-
-
-    renderer.setPixelRatio(
-        Math.min(
-            window.devicePixelRatio,
-            2
-        )
-    );
+        window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(
+            window.innerWidth,
+            window.innerHeight
+        ); renderer.setPixelRatio(
+            Math.min(
+                window.devicePixelRatio,
+                2
+            )
+        );
 
 }
 
@@ -760,9 +627,9 @@ window.addEventListener(
     'resize',
     handleResize
 );
-  
+
 // SEGUIMIENTO DE CÁMARA EN TERCERA PERSONA
-  
+
 
 const cameraTargetOffset =
     new THREE.Vector3(
@@ -788,10 +655,7 @@ function updateThirdPersonCamera(
 
         return;
 
-    }
-
-
-    // Punto que debe seguir la cámara
+    }  // Punto que debe seguir la cámara
 
     desiredCameraTarget
         .copy(
@@ -799,10 +663,7 @@ function updateThirdPersonCamera(
         )
         .add(
             cameraTargetOffset
-        );
-
-
-    // Cuánto se desplazó el personaje
+        );  // Cuánto se desplazó el personaje
 
     cameraMovement
         .copy(
@@ -810,17 +671,11 @@ function updateThirdPersonCamera(
         )
         .sub(
             controls.target
-        );
-
-
-    // Mover cámara junto con el personaje
+        );  // Mover cámara junto con el personaje
 
     camera.position.add(
         cameraMovement
-    );
-
-
-    // Nuevo objetivo de OrbitControls
+    );  // Nuevo objetivo de OrbitControls
 
     controls.target.copy(
         desiredCameraTarget
@@ -828,9 +683,8 @@ function updateThirdPersonCamera(
 
 }
 
-  
+
 // LOOP DE ANIMACIÓN
-  
 
 function animate() {
 
@@ -839,44 +693,32 @@ function animate() {
     );
 
 
-    // ========================================================
+
     // TIEMPO
-    // ========================================================
+
 
     timer.update();
-
 
     const deltaTime =
         timer.getDelta();
 
 
-    // ========================================================
-    // PERSONAJE
-    // ========================================================
 
+    // FÍSICA
+    stepPhysics();
+
+    // PERSONAJE
     const activePlayer =
         updatePlayer(
             deltaTime,
             camera
         );
 
-
-    // ========================================================
     // CÁMARA TERCERA PERSONA
-    // ========================================================
-
     updateThirdPersonCamera(
         activePlayer
-    );
-
-
-    controls.update();
-
-
-    // ========================================================
+    ); controls.update();
     // RENDER
-    // ========================================================
-
     renderer.render(
         scene,
         camera
@@ -885,10 +727,30 @@ function animate() {
 }
 
 
-  
+
 // INICIAR APLICACIÓN
-  
 
-loadEnvironment();
 
-animate();
+async function startGame() {
+    try {
+        // FÍSICA
+        await initPhysics();
+        // ESCENARIO
+        loadEnvironment();
+        // LOOP
+        animate();
+    } catch (
+    error
+    ) {
+        console.error(
+            '❌ Error iniciando el videojuego:',
+            error
+        );
+        gameStateElement.textContent =
+            'ERROR';
+    }
+
+}
+
+
+startGame();
