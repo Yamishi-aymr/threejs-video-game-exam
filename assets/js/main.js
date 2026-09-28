@@ -442,22 +442,31 @@ function loadEnvironment() {
                         // CÁMARA TEMPORAL SOBRE EL PERSONAJE
                         // ---------------------------------------
 
-                        camera.position.set(
-                            player.position.x + 5,
-                            player.position.y + 3,
-                            player.position.z + 7
-                        );
+                        // ---------------------------------------
+                        // CÁMARA EN TERCERA PERSONA
+                        // ---------------------------------------
 
+                        camera.position.set(
+                            player.position.x,
+                            player.position.y + 2.2,
+                            player.position.z + 4.5
+                        );
 
                         controls.target.set(
                             player.position.x,
-                            player.position.y + 1.2,
+                            player.position.y + 1.1,
                             player.position.z
                         );
 
+                        // Evitar que la cámara se aleje demasiado
+                        controls.minDistance = 2.5;
+                        controls.maxDistance = 6;
+
+                        // Evitar que pueda meterse demasiado debajo del personaje
+                        controls.minPolarAngle = 0.35;
+                        controls.maxPolarAngle = Math.PI / 2.05;
 
                         controls.update();
-
                     }
                 )
                 .catch(
@@ -751,7 +760,73 @@ window.addEventListener(
     'resize',
     handleResize
 );
+// ============================================================
+// SEGUIMIENTO DE CÁMARA EN TERCERA PERSONA
+// ============================================================
 
+const cameraTargetOffset =
+    new THREE.Vector3(
+        0,
+        1.1,
+        0
+    );
+
+const desiredCameraTarget =
+    new THREE.Vector3();
+
+const cameraMovement =
+    new THREE.Vector3();
+
+
+function updateThirdPersonCamera(
+    player
+) {
+
+    if (
+        !player
+    ) {
+
+        return;
+
+    }
+
+
+    // Punto que debe seguir la cámara
+
+    desiredCameraTarget
+        .copy(
+            player.position
+        )
+        .add(
+            cameraTargetOffset
+        );
+
+
+    // Cuánto se desplazó el personaje
+
+    cameraMovement
+        .copy(
+            desiredCameraTarget
+        )
+        .sub(
+            controls.target
+        );
+
+
+    // Mover cámara junto con el personaje
+
+    camera.position.add(
+        cameraMovement
+    );
+
+
+    // Nuevo objetivo de OrbitControls
+
+    controls.target.copy(
+        desiredCameraTarget
+    );
+
+}
 
 // ============================================================
 // LOOP DE ANIMACIÓN
@@ -779,14 +854,21 @@ function animate() {
     // PERSONAJE
     // ========================================================
 
-    updatePlayer(
-        deltaTime
+    const activePlayer =
+        updatePlayer(
+            deltaTime,
+            camera
+        );
+
+
+    // ========================================================
+    // CÁMARA TERCERA PERSONA
+    // ========================================================
+
+    updateThirdPersonCamera(
+        activePlayer
     );
 
-
-    // ========================================================
-    // CÁMARA
-    // ========================================================
 
     controls.update();
 
