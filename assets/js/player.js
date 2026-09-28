@@ -3,9 +3,9 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 
- 
+
 // VARIABLES DEL PERSONAJE
- 
+
 
 let player = null;
 
@@ -13,21 +13,24 @@ let mixer = null;
 
 let currentAction = null;
 
+let actionLocked = false;
+
+
 const actions = {};
 
 
- 
+
 // CONFIGURACIÓN DE MOVIMIENTO
- 
+
 
 const WALK_SPEED = 2.2;
 
 const RUN_SPEED = 4.5;
 
 
- 
+
 // TECLAS
- 
+
 
 const keyStates = {
     forward: false,
@@ -38,9 +41,9 @@ const keyStates = {
 };
 
 
- 
+
 // VECTORES REUTILIZABLES
- 
+
 
 const cameraForward =
     new THREE.Vector3();
@@ -70,9 +73,9 @@ const targetEuler =
     );
 
 
- 
+
 // EVENTOS DE TECLADO
- 
+
 
 window.addEventListener(
     'keydown',
@@ -94,6 +97,11 @@ window.addEventListener(
 
             case 'KeyD':
                 keyStates.right = true;
+                break;
+            case 'KeyF':
+
+                triggerThrow();
+
                 break;
 
             case 'ShiftLeft':
@@ -140,9 +148,9 @@ window.addEventListener(
 );
 
 
- 
+
 // EVITAR TECLAS ATASCADAS AL CAMBIAR DE VENTANA
- 
+
 
 window.addEventListener(
     'blur',
@@ -158,9 +166,9 @@ window.addEventListener(
 );
 
 
- 
+
 // CONVERTIR ANIMACIÓN A "IN PLACE"
- 
+
 
 function makeClipInPlace(
     originalClip
@@ -232,9 +240,9 @@ function makeClipInPlace(
 }
 
 
- 
+
 // CARGAR PERSONAJE
- 
+
 
 export function loadPlayer(
     scene,
@@ -401,7 +409,27 @@ export function loadPlayer(
                         }
                     );
 
+                    // -----------------------------------------------
+                    // DETECTAR FIN DE ANIMACIÓN THROW
+                    // -----------------------------------------------
 
+                    mixer.addEventListener(
+                        'finished',
+                        (event) => {
+
+                            if (
+                                event.action ===
+                                actions.Throw
+                            ) {
+
+                                actionLocked = false;
+
+                                currentAction = null;
+
+                            }
+
+                        }
+                    );
                     // -----------------------------------------------
                     // AGREGAR PERSONAJE
                     // -----------------------------------------------
@@ -507,9 +535,9 @@ export function loadPlayer(
 }
 
 
- 
+
 // CAMBIAR ANIMACIÓN
- 
+
 
 export function playAnimation(
     animationName
@@ -567,10 +595,64 @@ export function playAnimation(
 }
 
 
- 
-// ACTUALIZAR PERSONAJE
- 
+// ANIMACIÓN DE LANZAMIENTO
 
+
+export function triggerThrow() {
+
+    if (
+        !player ||
+        !mixer ||
+        !actions.Throw ||
+        actionLocked
+    ) {
+
+        return;
+
+    }
+
+
+    actionLocked = true;
+
+
+    if (
+        currentAction
+    ) {
+
+        currentAction.fadeOut(
+            0.12
+        );
+
+    }
+
+
+    const throwAction =
+        actions.Throw;
+
+
+    throwAction.reset();
+
+    throwAction.setLoop(
+        THREE.LoopOnce,
+        1
+    );
+
+    throwAction.clampWhenFinished =
+        true;
+
+    throwAction.fadeIn(
+        0.12
+    );
+
+    throwAction.play();
+
+
+    currentAction =
+        throwAction;
+
+}
+
+// ACTUALIZAR PERSONAJE
 export function updatePlayer(
     deltaTime,
     camera
@@ -590,6 +672,17 @@ export function updatePlayer(
     if (
         !player ||
         !camera
+    ) {
+
+        return player;
+
+    }
+    // ========================================================
+    // ACCIÓN TEMPORAL BLOQUEADA
+    // ========================================================
+
+    if (
+        actionLocked
     ) {
 
         return player;
@@ -810,9 +903,9 @@ export function updatePlayer(
 }
 
 
- 
+
 // OBTENER PERSONAJE
- 
+
 
 export function getPlayer() {
 

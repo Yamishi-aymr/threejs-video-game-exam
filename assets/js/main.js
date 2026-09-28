@@ -10,9 +10,9 @@ import {
 } from './player.js';
 
 
-// ============================================================
+  
 // ELEMENTOS HTML
-// ============================================================
+  
 
 const sceneContainer =
     document.getElementById('scene-container');
@@ -30,9 +30,9 @@ const gameStateElement =
     document.getElementById('game-state');
 
 
-// ============================================================
+  
 // ESCENA
-// ============================================================
+  
 
 const scene = new THREE.Scene();
 
@@ -47,9 +47,9 @@ scene.fog = new THREE.Fog(
 );
 
 
-// ============================================================
+  
 // CÁMARA
-// ============================================================
+  
 
 const camera = new THREE.PerspectiveCamera(
     60,
@@ -65,9 +65,9 @@ camera.position.set(
 );
 
 
-// ============================================================
+  
 // RENDERER
-// ============================================================
+  
 
 const renderer = new THREE.WebGLRenderer({
     antialias: true,
@@ -105,9 +105,9 @@ sceneContainer.appendChild(
 );
 
 
-// ============================================================
+  
 // CÁMARA / ORBIT CONTROLS
-// ============================================================
+  
 
 const controls = new OrbitControls(
     camera,
@@ -136,9 +136,9 @@ controls.target.set(
 );
 
 
-// ============================================================
+  
 // ILUMINACIÓN
-// ============================================================
+  
 
 // Luz ambiental general
 
@@ -235,17 +235,17 @@ scene.add(
 );
 
 
-// ============================================================
+  
 // ESCENARIO
-// ============================================================
+  
 
 let environment = null;
 
 let environmentBounds = null;
 
-// ============================================================
+  
 // TEMPORIZADOR
-// ============================================================
+  
 
 const timer =
     new THREE.Timer();
@@ -255,9 +255,9 @@ timer.connect(
 );
 
 
-// ============================================================
+  
 // CARGAR ESCENARIO GLB
-// ============================================================
+  
 
 function loadEnvironment() {
 
@@ -650,9 +650,9 @@ function loadEnvironment() {
 
 }
 
-// ============================================================
+  
 // AJUSTAR CÁMARA AL ESCENARIO
-// ============================================================
+  
 
 function configureCameraForEnvironment(
     size,
@@ -726,9 +726,9 @@ function configureCameraForEnvironment(
 }
 
 
-// ============================================================
+  
 // RESIZE
-// ============================================================
+  
 
 function handleResize() {
 
@@ -760,9 +760,9 @@ window.addEventListener(
     'resize',
     handleResize
 );
-// ============================================================
+  
 // SEGUIMIENTO DE CÁMARA EN TERCERA PERSONA
-// ============================================================
+  
 
 const cameraTargetOffset =
     new THREE.Vector3(
@@ -828,9 +828,9 @@ function updateThirdPersonCamera(
 
 }
 
-// ============================================================
+  
 // LOOP DE ANIMACIÓN
-// ============================================================
+  
 
 function animate() {
 
@@ -885,9 +885,9 @@ function animate() {
 }
 
 
-// ============================================================
+  
 // INICIAR APLICACIÓN
-// ============================================================
+  
 
 loadEnvironment();
 
