@@ -2,52 +2,67 @@ import * as THREE from 'three';
 
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 
+// ============================================================
 // ELEMENTOS HTML
+// ============================================================
+
+const sceneContainer =
+    document.getElementById('scene-container');
+
+const loadingScreen =
+    document.getElementById('loading-screen');
+
+const loadingProgress =
+    document.getElementById('loading-progress');
+
+const loadingMessage =
+    document.getElementById('loading-message');
+
+const gameStateElement =
+    document.getElementById('game-state');
 
 
-const sceneContainer = document.getElementById('scene-container');
-
-const loadingScreen = document.getElementById('loading-screen');
-
-const loadingProgress = document.getElementById('loading-progress');
-
-const loadingMessage = document.getElementById('loading-message');
-
-const gameStateElement = document.getElementById('game-state');
-
-
+// ============================================================
 // ESCENA
+// ============================================================
 
 const scene = new THREE.Scene();
 
-scene.background = new THREE.Color(0x080b0e);
+scene.background = new THREE.Color(
+    0x080b0e
+);
 
 scene.fog = new THREE.Fog(
     0x080b0e,
-    30,
-    85
+    40,
+    130
 );
 
 
+// ============================================================
 // CÁMARA
+// ============================================================
 
 const camera = new THREE.PerspectiveCamera(
     60,
     window.innerWidth / window.innerHeight,
     0.1,
-    300
+    500
 );
 
 camera.position.set(
-    9,
-    7,
-    12
+    12,
+    8,
+    18
 );
 
 
+// ============================================================
 // RENDERER
+// ============================================================
 
 const renderer = new THREE.WebGLRenderer({
     antialias: true,
@@ -68,20 +83,26 @@ renderer.setSize(
 
 renderer.shadowMap.enabled = true;
 
-renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.shadowMap.type =
+    THREE.PCFShadowMap;
 
-renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.outputColorSpace =
+    THREE.SRGBColorSpace;
 
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMapping =
+    THREE.ACESFilmicToneMapping;
 
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure =
+    1.1;
 
 sceneContainer.appendChild(
     renderer.domElement
 );
 
 
-// ORBIT CONTROLS
+// ============================================================
+// CÁMARA / ORBIT CONTROLS
+// ============================================================
 
 const controls = new OrbitControls(
     camera,
@@ -94,28 +115,47 @@ controls.dampingFactor = 0.06;
 
 controls.enablePan = false;
 
-controls.minDistance = 4;
+controls.enableZoom = true;
 
-controls.maxDistance = 30;
+controls.minDistance = 2;
 
-controls.maxPolarAngle = Math.PI / 2.05;
+controls.maxDistance = 80;
+
+controls.maxPolarAngle =
+    Math.PI / 2.05;
 
 controls.target.set(
     0,
-    1,
+    2,
     0
 );
 
 
+// ============================================================
 // ILUMINACIÓN
+// ============================================================
 
-// Luz ambiental
+// Luz ambiental general
 
-const hemisphereLight = new THREE.HemisphereLight(
-    0xbad8ff,
-    0x111417,
-    1.6
+const ambientLight =
+    new THREE.AmbientLight(
+        0xffffff,
+        0.7
+    );
+
+scene.add(
+    ambientLight
 );
+
+
+// Luz hemisférica
+
+const hemisphereLight =
+    new THREE.HemisphereLight(
+        0xc9e2ff,
+        0x191b1c,
+        1.4
+    );
 
 scene.add(
     hemisphereLight
@@ -124,15 +164,16 @@ scene.add(
 
 // Luz principal
 
-const directionalLight = new THREE.DirectionalLight(
-    0xffffff,
-    2.8
-);
+const directionalLight =
+    new THREE.DirectionalLight(
+        0xffffff,
+        2.2
+    );
 
 directionalLight.position.set(
-    8,
     15,
-    10
+    25,
+    15
 );
 
 directionalLight.castShadow = true;
@@ -142,35 +183,45 @@ directionalLight.shadow.mapSize.set(
     2048
 );
 
-directionalLight.shadow.camera.left = -20;
+directionalLight.shadow.camera.left =
+    -35;
 
-directionalLight.shadow.camera.right = 20;
+directionalLight.shadow.camera.right =
+    35;
 
-directionalLight.shadow.camera.top = 20;
+directionalLight.shadow.camera.top =
+    35;
 
-directionalLight.shadow.camera.bottom = -20;
+directionalLight.shadow.camera.bottom =
+    -35;
 
-directionalLight.shadow.camera.near = 0.1;
+directionalLight.shadow.camera.near =
+    0.5;
 
-directionalLight.shadow.camera.far = 50;
+directionalLight.shadow.camera.far =
+    100;
+
+directionalLight.shadow.bias =
+    -0.0002;
 
 scene.add(
     directionalLight
 );
 
 
-// Luz verde decorativa
+// Luz decorativa verde
 
-const reactorLight = new THREE.PointLight(
-    0x40ff9d,
-    18,
-    18,
-    2
-);
+const reactorLight =
+    new THREE.PointLight(
+        0x40ff9d,
+        5,
+        22,
+        2
+    );
 
 reactorLight.position.set(
     0,
-    3,
+    5,
     0
 );
 
@@ -179,298 +230,412 @@ scene.add(
 );
 
 
-// PISO TEMPORAL
+// ============================================================
+// ESCENARIO
+// ============================================================
 
-const floorGeometry = new THREE.PlaneGeometry(
-    40,
-    40
-);
+let environment = null;
 
-const floorMaterial = new THREE.MeshStandardMaterial({
-    color: 0x151a1d,
-    roughness: 0.9,
-    metalness: 0.1
-});
+let environmentBounds = null;
 
-const floor = new THREE.Mesh(
-    floorGeometry,
-    floorMaterial
-);
 
-floor.rotation.x = -Math.PI / 2;
+// ============================================================
+// CARGAR ESCENARIO GLB
+// ============================================================
 
-floor.receiveShadow = true;
+function loadEnvironment() {
 
-scene.add(
-    floor
-);
-
-
-// GRID
-
-const gridHelper = new THREE.GridHelper(
-    40,
-    40,
-    0x40ff9d,
-    0x293134
-);
-
-gridHelper.position.y = 0.01;
-
-scene.add(
-    gridHelper
-);
-
-
-// OBJETO CENTRAL TEMPORAL
-
-const reactorGroup = new THREE.Group();
-
-scene.add(
-    reactorGroup
-);
-
-
-// Base
-
-const baseGeometry = new THREE.CylinderGeometry(
-    2.2,
-    2.5,
-    0.5,
-    32
-);
-
-const baseMaterial = new THREE.MeshStandardMaterial({
-    color: 0x161c20,
-    roughness: 0.45,
-    metalness: 0.75
-});
-
-const base = new THREE.Mesh(
-    baseGeometry,
-    baseMaterial
-);
-
-base.position.y = 0.25;
-
-base.castShadow = true;
-
-base.receiveShadow = true;
-
-reactorGroup.add(
-    base
-);
-
-
-// Núcleo
-
-const coreGeometry = new THREE.IcosahedronGeometry(
-    1,
-    3
-);
-
-const coreMaterial = new THREE.MeshStandardMaterial({
-    color: 0x40ff9d,
-    emissive: 0x18aa60,
-    emissiveIntensity: 2.5,
-    roughness: 0.25,
-    metalness: 0.15
-});
-
-const core = new THREE.Mesh(
-    coreGeometry,
-    coreMaterial
-);
-
-core.position.y = 2;
-
-core.castShadow = true;
-
-reactorGroup.add(
-    core
-);
-
-
-// Anillos
-
-const ringMaterial = new THREE.MeshStandardMaterial({
-    color: 0xc5d1d8,
-    metalness: 0.85,
-    roughness: 0.25
-});
-
-for (let i = 0; i < 3; i++) {
-
-    const ringGeometry = new THREE.TorusGeometry(
-        1.55 + (i * 0.25),
-        0.035,
-        12,
-        64
-    );
-
-    const ring = new THREE.Mesh(
-        ringGeometry,
-        ringMaterial
-    );
-
-    ring.position.y = 2;
-
-    ring.rotation.x = Math.PI / 2;
-
-    ring.rotation.y = i * 0.65;
-
-    reactorGroup.add(
-        ring
-    );
-
-}
-
-
-// OBJETOS TEMPORALES
-
-function createTestBox(
-    x,
-    y,
-    z,
-    width,
-    height,
-    depth
-) {
-
-    const geometry = new THREE.BoxGeometry(
-        width,
-        height,
-        depth
-    );
-
-    const material = new THREE.MeshStandardMaterial({
-        color: 0x262e33,
-        roughness: 0.65,
-        metalness: 0.25
-    });
-
-    const box = new THREE.Mesh(
-        geometry,
-        material
-    );
-
-    box.position.set(
-        x,
-        y,
-        z
-    );
-
-    box.castShadow = true;
-
-    box.receiveShadow = true;
-
-    scene.add(
-        box
-    );
-
-    return box;
-
-}
-
-
-createTestBox(
-    -4,
-    0.75,
-    -3,
-    1.5,
-    1.5,
-    1.5
-);
-
-createTestBox(
-    4,
-    1,
-    -4,
-    2,
-    2,
-    2
-);
-
-createTestBox(
-    -5,
-    0.5,
-    4,
-    1,
-    1,
-    1
-);
-
-createTestBox(
-    5,
-    1.5,
-    3,
-    2,
-    3,
-    1
-);
-
-
-// RELOJ THREE.JS
-const timer = new THREE.Timer();
-
-timer.connect(document);
-
-
-// SIMULACIÓN DE CARGA INICIAL
-
-function initializeLoadingScreen() {
-
-    loadingProgress.style.width = '25%';
+    loadingProgress.style.width =
+        '10%';
 
     loadingMessage.textContent =
-        'Inicializando motor gráfico...';
+        'Cargando instalación...';
+
+    gameStateElement.textContent =
+        'CARGANDO';
 
 
-    setTimeout(() => {
-
-        loadingProgress.style.width = '55%';
-
-        loadingMessage.textContent =
-            'Configurando iluminación...';
-
-    }, 250);
+    const loader =
+        new GLTFLoader();
 
 
-    setTimeout(() => {
+    loader.load(
 
-        loadingProgress.style.width = '80%';
-
-        loadingMessage.textContent =
-            'Preparando simulación...';
-
-    }, 500);
+        './assets/models/environment/kitchen_and_lab.glb',
 
 
-    setTimeout(() => {
+        // ====================================================
+        // MODELO CARGADO
+        // ====================================================
 
-        loadingProgress.style.width = '100%';
+        (gltf) => {
 
-        loadingMessage.textContent =
-            'Sistema listo';
-
-    }, 750);
+            environment =
+                gltf.scene;
 
 
-    setTimeout(() => {
+            // -----------------------------------------------
+            // CONFIGURACIÓN DE MALLAS
+            // -----------------------------------------------
 
-        loadingScreen.classList.add(
-            'hidden'
-        );
+            let meshCount = 0;
 
-        gameStateElement.textContent =
-            'SISTEMA LISTO';
 
-    }, 1100);
+            environment.traverse(
+                (object) => {
+
+                    if (
+                        object.isMesh
+                    ) {
+
+                        meshCount++;
+
+
+                        /*
+                        No activamos castShadow en todo
+                        el escenario porque contiene
+                        muchos objetos y sería costoso.
+                        */
+
+                        object.castShadow = false;
+
+                        object.receiveShadow = true;
+
+
+                        /*
+                        Evita problemas visuales
+                        con geometrías frustum-culling
+                        demasiado complejas.
+                        */
+
+                        object.frustumCulled = true;
+
+                    }
+
+                }
+            );
+
+
+            // -----------------------------------------------
+            // CALCULAR LÍMITES DEL MODELO
+            // -----------------------------------------------
+
+            let box =
+                new THREE.Box3()
+                    .setFromObject(
+                        environment
+                    );
+
+
+            const center =
+                box.getCenter(
+                    new THREE.Vector3()
+                );
+
+
+            // -----------------------------------------------
+            // CENTRAR ESCENARIO EN X Y Z
+            // -----------------------------------------------
+
+            environment.position.x -=
+                center.x;
+
+            environment.position.z -=
+                center.z;
+
+
+            // -----------------------------------------------
+            // COLOCAR EL PISO EN Y = 0
+            // -----------------------------------------------
+
+            environment.position.y -=
+                box.min.y;
+
+
+            // -----------------------------------------------
+            // AGREGAR ESCENARIO
+            // -----------------------------------------------
+
+            scene.add(
+                environment
+            );
+
+
+            // -----------------------------------------------
+            // RECALCULAR LÍMITES
+            // -----------------------------------------------
+
+            box =
+                new THREE.Box3()
+                    .setFromObject(
+                        environment
+                    );
+
+
+            environmentBounds =
+                box;
+
+
+            const size =
+                box.getSize(
+                    new THREE.Vector3()
+                );
+
+
+            const newCenter =
+                box.getCenter(
+                    new THREE.Vector3()
+                );
+
+
+            // -----------------------------------------------
+            // AJUSTAR CÁMARA AUTOMÁTICAMENTE
+            // -----------------------------------------------
+
+            configureCameraForEnvironment(
+                size,
+                newCenter
+            );
+
+
+            // -----------------------------------------------
+            // AJUSTAR NIEBLA
+            // -----------------------------------------------
+
+            const maxDimension =
+                Math.max(
+                    size.x,
+                    size.y,
+                    size.z
+                );
+
+
+            scene.fog.near =
+                maxDimension * 0.8;
+
+            scene.fog.far =
+                maxDimension * 3;
+
+
+            // -----------------------------------------------
+            // AJUSTAR LUZ PRINCIPAL
+            // -----------------------------------------------
+
+            directionalLight.position.set(
+                maxDimension * 0.4,
+                maxDimension * 0.7,
+                maxDimension * 0.4
+            );
+
+
+            // -----------------------------------------------
+            // INFORMACIÓN EN CONSOLA
+            // -----------------------------------------------
+
+            console.log(
+                '✅ Escenario cargado correctamente'
+            );
+
+            console.log(
+                '📦 Modelo:',
+                'kitchen_and_lab.glb'
+            );
+
+            console.log(
+                '🧩 Mallas encontradas:',
+                meshCount
+            );
+
+            console.log(
+                '📐 Tamaño del escenario:',
+                {
+                    ancho:
+                        size.x.toFixed(2),
+
+                    alto:
+                        size.y.toFixed(2),
+
+                    profundidad:
+                        size.z.toFixed(2)
+                }
+            );
+
+
+            // -----------------------------------------------
+            // FINALIZAR CARGA
+            // -----------------------------------------------
+
+            loadingProgress.style.width =
+                '100%';
+
+            loadingMessage.textContent =
+                'Instalación preparada';
+
+            gameStateElement.textContent =
+                'ESCENARIO LISTO';
+
+
+            setTimeout(
+                () => {
+
+                    loadingScreen.classList.add(
+                        'hidden'
+                    );
+
+                },
+                500
+            );
+
+        },
+
+
+        // ====================================================
+        // PROGRESO DE CARGA
+        // ====================================================
+
+        (xhr) => {
+
+            if (
+                xhr.lengthComputable
+            ) {
+
+                const percent =
+                    Math.round(
+                        (
+                            xhr.loaded /
+                            xhr.total
+                        ) * 100
+                    );
+
+
+                loadingProgress.style.width =
+                    `${percent}%`;
+
+
+                loadingMessage.textContent =
+                    `Cargando instalación... ${percent}%`;
+
+            } else {
+
+                loadingMessage.textContent =
+                    'Cargando instalación...';
+
+            }
+
+        },
+
+
+        // ====================================================
+        // ERROR
+        // ====================================================
+
+        (error) => {
+
+            console.error(
+                '❌ Error cargando el escenario:',
+                error
+            );
+
+
+            loadingMessage.textContent =
+                'Error al cargar el escenario';
+
+            gameStateElement.textContent =
+                'ERROR';
+
+
+            loadingProgress.style.width =
+                '100%';
+
+            loadingProgress.style.background =
+                '#ff445a';
+
+        }
+
+    );
 
 }
 
 
+// ============================================================
+// AJUSTAR CÁMARA AL ESCENARIO
+// ============================================================
+
+function configureCameraForEnvironment(
+    size,
+    center
+) {
+
+    const maxDimension =
+        Math.max(
+            size.x,
+            size.y,
+            size.z
+        );
+
+
+    // Posición inicial elevada
+    // para poder revisar el escenario completo
+
+    camera.position.set(
+
+        center.x +
+            maxDimension * 0.55,
+
+        center.y +
+            maxDimension * 0.35,
+
+        center.z +
+            maxDimension * 0.7
+
+    );
+
+
+    // La cámara mira aproximadamente
+    // al centro del edificio
+
+    controls.target.set(
+
+        center.x,
+
+        Math.max(
+            1.5,
+            size.y * 0.25
+        ),
+
+        center.z
+
+    );
+
+
+    controls.minDistance =
+        2;
+
+    controls.maxDistance =
+        maxDimension * 2;
+
+
+    camera.near =
+        0.1;
+
+    camera.far =
+        Math.max(
+            500,
+            maxDimension * 10
+        );
+
+
+    camera.updateProjectionMatrix();
+
+
+    controls.update();
+
+}
+
+
+// ============================================================
 // RESIZE
+// ============================================================
 
 function handleResize() {
 
@@ -478,12 +643,15 @@ function handleResize() {
         window.innerWidth /
         window.innerHeight;
 
+
     camera.updateProjectionMatrix();
+
 
     renderer.setSize(
         window.innerWidth,
         window.innerHeight
     );
+
 
     renderer.setPixelRatio(
         Math.min(
@@ -494,77 +662,21 @@ function handleResize() {
 
 }
 
+
 window.addEventListener(
     'resize',
     handleResize
 );
 
 
-// ANIMACIÓN
+// ============================================================
+// LOOP DE ANIMACIÓN
+// ============================================================
 
 function animate() {
 
     requestAnimationFrame(
         animate
-    );
-
-
-    timer.update();
-
-    const deltaTime =
-        timer.getDelta();
-
-    const elapsedTime =
-        timer.getElapsed();
-
-    // Rotación suave del núcleo
-
-    core.rotation.x +=
-        deltaTime * 0.2;
-
-    core.rotation.y +=
-        deltaTime * 0.35;
-
-
-    // Flotación
-
-    core.position.y =
-        2 +
-        Math.sin(
-            elapsedTime * 1.6
-        ) * 0.08;
-
-
-    // Pulso de luz
-
-    reactorLight.intensity =
-        17 +
-        Math.sin(
-            elapsedTime * 2
-        ) * 3;
-
-
-    // Anillos
-
-    reactorGroup.children.forEach(
-        (child, index) => {
-
-            if (
-                child.geometry &&
-                child.geometry.type ===
-                'TorusGeometry'
-            ) {
-
-                child.rotation.z +=
-                    deltaTime *
-                    (
-                        0.2 +
-                        index * 0.04
-                    );
-
-            }
-
-        }
     );
 
 
@@ -579,8 +691,10 @@ function animate() {
 }
 
 
+// ============================================================
 // INICIAR APLICACIÓN
+// ============================================================
 
-initializeLoadingScreen();
+loadEnvironment();
 
 animate();
