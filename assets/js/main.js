@@ -291,22 +291,39 @@ function loadEnvironment() {
                         meshCount++;
 
 
-                        /*
-                        No activamos castShadow en todo
-                        el escenario porque contiene
-                        muchos objetos y sería costoso.
-                        */
+                        // =================================================
+                        // OCULTAR PAREDES ROSAS DEL MODELO ORIGINAL
+                        // =================================================
+
+                        if (
+                            object.name.includes(
+                                'WallCinematicaIntroduccion'
+                            )
+                        ) {
+
+                            object.visible = true;
+
+                            object.material =
+                                new THREE.MeshStandardMaterial({
+                                    color: 0x70777a,
+                                    roughness: 0.85,
+                                    metalness: 0.05
+                                });
+
+                            console.log(
+                                '🎨 Material corregido:',
+                                object.name
+                            );
+                        }
+
+
+                        // =================================================
+                        // CONFIGURACIÓN GENERAL
+                        // =================================================
 
                         object.castShadow = false;
 
                         object.receiveShadow = true;
-
-
-                        /*
-                        Evita problemas visuales
-                        con geometrías frustum-culling
-                        demasiado complejas.
-                        */
 
                         object.frustumCulled = true;
 
@@ -580,13 +597,13 @@ function configureCameraForEnvironment(
     camera.position.set(
 
         center.x +
-            maxDimension * 0.55,
+        maxDimension * 0.55,
 
         center.y +
-            maxDimension * 0.35,
+        maxDimension * 0.35,
 
         center.z +
-            maxDimension * 0.7
+        maxDimension * 0.7
 
     );
 
