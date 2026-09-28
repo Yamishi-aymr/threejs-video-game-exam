@@ -6,7 +6,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 import {
     loadPlayer,
-    updatePlayer
+    updatePlayer,
+    getPlayer
 } from './player.js';
 
 import {
@@ -16,8 +17,15 @@ import {
     createPlayerPhysics
 } from './physics.js';
 
-// ELEMENTOS HTML
+import {
+    prepareDoorsForExploration,
+    debugNearestDoor
+} from './doors.js';
 
+
+
+
+// ELEMENTOS HTML
 
 const sceneContainer =
     document.getElementById('scene-container');
@@ -334,16 +342,32 @@ function loadEnvironment() {
                             environment.position.y -=
                                 box.min.y;
 
-                            // AGREGAR ESCENARIO
                             scene.add(
                                 environment
                             );
+                            
+
+                            // -----------------------------------------------
+                            // PREPARAR PUERTAS PARA EXPLORACIÓN
+                            // -----------------------------------------------
+
+                            prepareDoorsForExploration(
+                                environment
+                            );
+
+
+                            // -----------------------------------------------
                             // ACTUALIZAR MATRICES DEL ESCENARIO
+                            // -----------------------------------------------
 
                             environment.updateMatrixWorld(
                                 true
                             );
+
+
+                            // -----------------------------------------------
                             // CREAR COLLIDER FÍSICO DEL ESCENARIO
+                            // -----------------------------------------------
 
                             createEnvironmentCollider(
                                 environment
@@ -602,7 +626,6 @@ function configureCameraForEnvironment(
 }
 
 
-
 // RESIZE
 
 
@@ -713,6 +736,15 @@ function animate() {
             deltaTime,
             camera
         );
+
+    // ========================================================
+    // DEPURACIÓN DE PUERTAS
+    // ========================================================
+
+    debugNearestDoor(
+        activePlayer,
+        3
+    );
 
     // CÁMARA TERCERA PERSONA
     updateThirdPersonCamera(
