@@ -48,6 +48,15 @@ import {
 
 } from './projectiles.js';
 
+
+import {
+
+    createMissionCores,
+
+    updateCores
+
+} from './cores.js';
+
 // ============================================================
 
 // ELEMENTOS HTML
@@ -697,6 +706,16 @@ function loadEnvironment() {
 
                             player.position
 
+                        );
+
+
+                        // -------------------------------------
+                        // 5 NÚCLEOS DE LA MISIÓN
+                        // -------------------------------------
+
+                        createMissionCores(
+                            scene,
+                            player
                         );
 
                         // -------------------------------------
@@ -1928,6 +1947,16 @@ function animate() {
 
         scene
 
+    );
+
+
+    // --------------------------------------------------------
+    // NÚCLEOS DE ENERGÍA
+    // --------------------------------------------------------
+
+    updateCores(
+        deltaTime,
+        scene
     );
 
     // --------------------------------------------------------
