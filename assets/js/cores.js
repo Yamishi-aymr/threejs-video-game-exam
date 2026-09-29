@@ -129,6 +129,15 @@ let coreHudElement =
     null;
 
 
+// Estado final de la misión.
+let missionComplete =
+    false;
+
+
+let victoryOverlayElement =
+    null;
+
+
 // Posiciones elegidas para la partida actual.
 let selectedCorePositions =
     [];
@@ -725,6 +734,312 @@ function createCore(
 
 
 // ============================================================
+// PANTALLA DE VICTORIA
+// ============================================================
+
+function showVictoryScreen() {
+
+    if (
+        victoryOverlayElement
+    ) {
+
+        return;
+
+    }
+
+
+    missionComplete =
+        true;
+
+
+    const gameStateElement =
+        document.getElementById(
+            'game-state'
+        );
+
+
+    if (
+        gameStateElement
+    ) {
+
+        gameStateElement.textContent =
+            'VICTORIA';
+
+    }
+
+
+    victoryOverlayElement =
+        document.createElement(
+            'div'
+        );
+
+
+    victoryOverlayElement.id =
+        'victory-overlay';
+
+
+    Object.assign(
+        victoryOverlayElement.style,
+        {
+
+            position:
+                'fixed',
+
+            inset:
+                '0',
+
+            zIndex:
+                '10000',
+
+            display:
+                'flex',
+
+            alignItems:
+                'center',
+
+            justifyContent:
+                'center',
+
+            background:
+                'rgba(3, 7, 9, 0.78)',
+
+            backdropFilter:
+                'blur(6px)',
+
+            opacity:
+                '0',
+
+            transition:
+                'opacity 280ms ease',
+
+            fontFamily:
+                'system-ui, sans-serif'
+
+        }
+    );
+
+
+    const panel =
+        document.createElement(
+            'div'
+        );
+
+
+    Object.assign(
+        panel.style,
+        {
+
+            width:
+                'min(520px, calc(100vw - 36px))',
+
+            padding:
+                '34px 30px',
+
+            border:
+                '1px solid rgba(64, 255, 157, 0.65)',
+
+            borderRadius:
+                '14px',
+
+            background:
+                'rgba(8, 11, 14, 0.95)',
+
+            color:
+                '#ffffff',
+
+            textAlign:
+                'center',
+
+            boxShadow:
+                '0 18px 60px rgba(0,0,0,0.48)'
+
+        }
+    );
+
+
+    const smallTitle =
+        document.createElement(
+            'div'
+        );
+
+
+    smallTitle.textContent =
+        'OPERACIÓN: REACTOR';
+
+
+    Object.assign(
+        smallTitle.style,
+        {
+
+            marginBottom:
+                '12px',
+
+            color:
+                '#40ff9d',
+
+            fontSize:
+                '13px',
+
+            fontWeight:
+                '800',
+
+            letterSpacing:
+                '0.18em'
+
+        }
+    );
+
+
+    const title =
+        document.createElement(
+            'h2'
+        );
+
+
+    title.textContent =
+        'MISIÓN COMPLETADA';
+
+
+    Object.assign(
+        title.style,
+        {
+
+            margin:
+                '0 0 12px',
+
+            fontSize:
+                'clamp(28px, 5vw, 42px)',
+
+            lineHeight:
+                '1',
+
+            letterSpacing:
+                '0.04em'
+
+        }
+    );
+
+
+    const message =
+        document.createElement(
+            'p'
+        );
+
+
+    message.textContent =
+        `Desactivaste los ${TOTAL_CORES} núcleos de energía.`;
+
+
+    Object.assign(
+        message.style,
+        {
+
+            margin:
+                '0 0 26px',
+
+            color:
+                'rgba(255,255,255,0.78)',
+
+            fontSize:
+                '16px',
+
+            lineHeight:
+                '1.5'
+
+        }
+    );
+
+
+    const restartButton =
+        document.createElement(
+            'button'
+        );
+
+
+    restartButton.type =
+        'button';
+
+
+    restartButton.textContent =
+        'JUGAR DE NUEVO';
+
+
+    Object.assign(
+        restartButton.style,
+        {
+
+            padding:
+                '12px 20px',
+
+            border:
+                '1px solid #40ff9d',
+
+            borderRadius:
+                '8px',
+
+            background:
+                'rgba(64,255,157,0.12)',
+
+            color:
+                '#ffffff',
+
+            fontSize:
+                '14px',
+
+            fontWeight:
+                '800',
+
+            letterSpacing:
+                '0.08em',
+
+            cursor:
+                'pointer'
+
+        }
+    );
+
+
+    restartButton.addEventListener(
+        'click',
+        () => {
+
+            window.location.reload();
+
+        }
+    );
+
+
+    panel.append(
+        smallTitle,
+        title,
+        message,
+        restartButton
+    );
+
+
+    victoryOverlayElement.appendChild(
+        panel
+    );
+
+
+    document.body.appendChild(
+        victoryOverlayElement
+    );
+
+
+    requestAnimationFrame(
+        () => {
+
+            victoryOverlayElement.style.opacity =
+                '1';
+
+        }
+    );
+
+}
+
+
+// ============================================================
 // CREAR LOS 5 NÚCLEOS ALEATORIOS
 // ============================================================
 
@@ -755,6 +1070,10 @@ export function createMissionCores(
 
     destroyedCoreCount =
         0;
+
+
+    missionComplete =
+        false;
 
 
     updateCoreHUD();
@@ -933,6 +1252,9 @@ function destroyCore(
             '✅ Todos los núcleos fueron destruidos.'
         );
 
+
+        showVictoryScreen();
+
     }
 
 }
@@ -1090,6 +1412,13 @@ export function updateCores(
 // ============================================================
 // GETTERS
 // ============================================================
+
+export function isMissionComplete() {
+
+    return missionComplete;
+
+}
+
 
 export function getDestroyedCoreCount() {
 

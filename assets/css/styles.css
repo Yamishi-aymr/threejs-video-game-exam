@@ -478,6 +478,331 @@ body {
 
 
 /* ===
+   TEMPORIZADOR DE LA MISIÓN
+=== */
+
+/* ===
+   PANTALLA DE INTRODUCCIÓN
+=== */
+
+.game-intro-overlay {
+    position: fixed;
+
+    inset: 0;
+
+    z-index: 9500;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 24px;
+
+    background:
+        radial-gradient(
+            circle at 50% 35%,
+            rgba(20, 45, 39, 0.92),
+            rgba(3, 7, 9, 0.97) 58%,
+            rgba(0, 0, 0, 0.99)
+        );
+
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+
+    opacity: 0;
+    visibility: hidden;
+
+    transition:
+        opacity 0.35s ease,
+        visibility 0.35s ease;
+}
+
+.game-intro-overlay.is-visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.game-intro-panel {
+    width: min(720px, 100%);
+    max-height: calc(100vh - 48px);
+
+    overflow-y: auto;
+
+    padding: 34px 34px 30px;
+
+    border: 1px solid rgba(64, 255, 157, 0.48);
+    border-radius: 16px;
+
+    background: rgba(8, 11, 14, 0.94);
+
+    color: #ffffff;
+
+    box-shadow:
+        0 22px 70px rgba(0, 0, 0, 0.58);
+}
+
+.game-intro-eyebrow {
+    margin-bottom: 10px;
+
+    color: #40ff9d;
+
+    font-size: 0.75rem;
+    font-weight: 800;
+
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+}
+
+.game-intro-title {
+    margin: 0 0 10px;
+
+    color: #ffffff;
+
+    font-size: clamp(2.1rem, 7vw, 3.65rem);
+    font-weight: 900;
+
+    line-height: 0.95;
+
+    letter-spacing: 0.02em;
+}
+
+.game-intro-subtitle {
+    margin-bottom: 26px;
+
+    color: rgba(255, 255, 255, 0.72);
+
+    font-size: 1rem;
+    line-height: 1.55;
+}
+
+.game-intro-story {
+    margin-bottom: 22px;
+
+    padding: 18px 20px;
+
+    border-left: 3px solid rgba(64, 255, 157, 0.72);
+
+    background: rgba(255, 255, 255, 0.035);
+
+    color: rgba(255, 255, 255, 0.84);
+
+    font-size: 0.94rem;
+    line-height: 1.65;
+}
+
+.game-intro-story-label {
+    color: #ffffff;
+}
+
+.game-intro-section-title {
+    margin-bottom: 10px;
+
+    color: #ffffff;
+
+    font-size: 0.8rem;
+    font-weight: 800;
+
+    letter-spacing: 0.14em;
+}
+
+.game-intro-mission {
+    margin-bottom: 22px;
+
+    color: rgba(255, 255, 255, 0.76);
+
+    font-size: 0.94rem;
+    line-height: 1.6;
+}
+
+.game-intro-start-button {
+    width: 100%;
+    min-height: 52px;
+
+    padding: 13px 20px;
+
+    border: 1px solid #40ff9d;
+    border-radius: 9px;
+
+    background: rgba(64, 255, 157, 0.13);
+
+    color: #ffffff;
+
+    font-family: inherit;
+    font-size: 0.94rem;
+    font-weight: 900;
+
+    letter-spacing: 0.12em;
+
+    cursor: pointer;
+
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        transform 0.15s ease;
+}
+
+.game-intro-start-button:hover {
+    background: rgba(64, 255, 157, 0.23);
+}
+
+.game-intro-start-button:active {
+    transform: scale(0.99);
+}
+
+.game-intro-start-button:focus-visible {
+    outline: 2px solid #40ff9d;
+    outline-offset: 3px;
+}
+
+
+/* ===
+   PANTALLA DE RESULTADO
+   DERROTA
+=== */
+
+.game-result-overlay {
+    position: fixed;
+
+    inset: 0;
+
+    z-index: 10000;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 18px;
+
+    opacity: 0;
+    visibility: hidden;
+
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+
+    transition:
+        opacity 0.28s ease,
+        visibility 0.28s ease;
+}
+
+.game-result-overlay.is-visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.game-result-overlay--defeat {
+    background: rgba(12, 2, 2, 0.82);
+}
+
+.game-result-panel {
+    width: min(520px, calc(100vw - 36px));
+
+    padding: 34px 30px;
+
+    border-radius: 14px;
+
+    color: #ffffff;
+
+    text-align: center;
+
+    box-shadow:
+        0 18px 60px rgba(0, 0, 0, 0.52);
+}
+
+.game-result-panel--defeat {
+    border: 1px solid rgba(255, 88, 88, 0.72);
+
+    background: rgba(16, 8, 8, 0.96);
+}
+
+.game-result-eyebrow {
+    margin-bottom: 12px;
+
+    font-size: 0.8rem;
+    font-weight: 800;
+
+    letter-spacing: 0.18em;
+}
+
+.game-result-eyebrow--defeat {
+    color: #ff6464;
+}
+
+.game-result-title {
+    margin: 0 0 12px;
+
+    font-size: clamp(1.75rem, 5vw, 2.65rem);
+
+    line-height: 1;
+
+    letter-spacing: 0.04em;
+}
+
+.game-result-message {
+    margin-bottom: 26px;
+
+    color: rgba(255, 255, 255, 0.78);
+
+    font-size: 1rem;
+    line-height: 1.5;
+}
+
+.game-result-button {
+    min-height: 46px;
+
+    padding: 12px 20px;
+
+    border-radius: 8px;
+
+    color: #ffffff;
+
+    font-family: inherit;
+    font-size: 0.88rem;
+    font-weight: 800;
+
+    letter-spacing: 0.08em;
+
+    cursor: pointer;
+
+    transition:
+        background 0.15s ease,
+        transform 0.15s ease;
+}
+
+.game-result-button--defeat {
+    border: 1px solid #ff6464;
+
+    background: rgba(255, 100, 100, 0.12);
+}
+
+.game-result-button--defeat:hover {
+    background: rgba(255, 100, 100, 0.22);
+}
+
+.game-result-button:active {
+    transform: scale(0.98);
+}
+
+.game-result-button:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 3px;
+}
+
+
+
+
+/* ===
+   ALERTA DEL TIEMPO EN EL HUD SUPERIOR
+=== */
+
+.hud-time-danger {
+    color: #ff6b6b !important;
+
+    text-shadow:
+        0 0 10px rgba(255, 107, 107, 0.35);
+}
+
+
+/* ===
    ANIMACIONES
 === */
 
@@ -547,6 +872,10 @@ body {
         overflow-x: auto;
     }
 
+    .game-intro-panel {
+        padding: 28px 24px 24px;
+    }
+
 }
 
 @media (max-width: 600px) {
@@ -572,7 +901,29 @@ body {
         display: none;
     }
 
+    .game-intro-overlay {
+        padding: 14px;
+    }
+
+    .game-intro-panel {
+        max-height: calc(100vh - 28px);
+
+        padding: 24px 18px 20px;
+    }
+
+    .game-intro-title {
+        font-size: 2.15rem;
+    }
+
+    .game-intro-subtitle,
+    .game-intro-story,
+    .game-intro-mission {
+        font-size: 0.88rem;
+    }
+
 }
+
+
 /* ===
    FOOTER
 === */
@@ -638,6 +989,23 @@ body {
 
     .game-footer {
         display: none;
+    }
+
+}
+
+
+/* ===
+   ACCESIBILIDAD / MOVIMIENTO REDUCIDO
+=== */
+
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
     }
 
 }

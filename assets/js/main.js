@@ -61,7 +61,9 @@ import {
 
     createMissionCores,
 
-    updateCores
+    updateCores,
+
+    isMissionComplete
 
 } from './cores.js';
 
@@ -497,6 +499,956 @@ timer.connect(
 
 );
 
+
+// ============================================================
+// TEMPORIZADOR DE LA MISIÓN
+// ============================================================
+//
+// Tiempo inicial:
+// 3 minutos.
+//
+// Si después quieres más o menos tiempo, solo cambia:
+//
+// GAME_TIME_SECONDS = 3 * 60;
+//
+// Ejemplos:
+// 3 minutos -> 3 * 60
+// 8 minutos -> 8 * 60
+// ============================================================
+
+const GAME_TIME_SECONDS =
+    3 * 60;
+
+
+let missionTimeRemaining =
+    GAME_TIME_SECONDS;
+
+
+let missionTimerStarted =
+    false;
+
+
+let gameOver =
+    false;
+
+
+let missionTimerElement =
+    null;
+
+
+let defeatOverlayElement =
+    null;
+
+
+// ============================================================
+// ESTADO DE INICIO DE LA PARTIDA
+// ============================================================
+
+let gameStarted =
+    false;
+
+
+let environmentReady =
+    false;
+
+
+let playerReady =
+    false;
+
+
+let introOverlayElement =
+    null;
+
+
+// ============================================================
+// MÚSICA DE FONDO
+// ============================================================
+
+const backgroundMusic =
+    new Audio(
+        './assets/sounds/videoplayback.m4a'
+    );
+
+
+backgroundMusic.loop =
+    true;
+
+
+// Volumen: 0.0 a 1.0
+backgroundMusic.volume =
+    0.25;
+
+
+backgroundMusic.preload =
+    'auto';
+
+
+let backgroundMusicStarted =
+    false;
+
+
+function startBackgroundMusic() {
+
+    if (
+        backgroundMusicStarted
+    ) {
+
+        return;
+
+    }
+
+
+    backgroundMusicStarted =
+        true;
+
+
+    backgroundMusic.currentTime =
+        0;
+
+
+    backgroundMusic.play()
+        .catch(
+            (error) => {
+
+                backgroundMusicStarted =
+                    false;
+
+
+                console.warn(
+                    '⚠️ No se pudo iniciar la música:',
+                    error
+                );
+
+            }
+        );
+
+}
+
+
+function stopBackgroundMusic() {
+
+    if (
+        !backgroundMusicStarted
+    ) {
+
+        return;
+
+    }
+
+
+    backgroundMusic.pause();
+
+
+    backgroundMusicStarted =
+        false;
+
+}
+
+
+// ============================================================
+// PANTALLA DE INTRODUCCIÓN
+// ============================================================
+
+function createIntroScreen() {
+
+    if (
+        introOverlayElement
+    ) {
+
+        return introOverlayElement;
+
+    }
+
+
+    introOverlayElement =
+        document.createElement(
+            'div'
+        );
+
+
+    introOverlayElement.id =
+        'game-intro-overlay';
+
+
+    introOverlayElement.className =
+        'game-intro-overlay';
+
+
+    const panel =
+        document.createElement(
+            'div'
+        );
+
+
+    panel.className =
+        'game-intro-panel';
+
+
+    const eyebrow =
+        document.createElement(
+            'div'
+        );
+
+
+    eyebrow.className =
+        'game-intro-eyebrow';
+
+
+    eyebrow.textContent =
+        'MISIÓN DE CONTENCIÓN';
+
+
+    const title =
+        document.createElement(
+            'h1'
+        );
+
+
+    title.className =
+        'game-intro-title';
+
+
+    title.textContent =
+        'OPERACIÓN: REACTOR';
+
+
+    const subtitle =
+        document.createElement(
+            'p'
+        );
+
+
+    subtitle.className =
+        'game-intro-subtitle';
+
+
+    subtitle.textContent =
+        'Una instalación abandonada. Cinco núcleos inestables. Tres minutos para detener una reacción en cadena.';
+
+
+    const story =
+        document.createElement(
+            'div'
+        );
+
+
+    story.className =
+        'game-intro-story';
+
+
+    const storyLabel =
+        document.createElement(
+            'strong'
+        );
+
+
+    storyLabel.className =
+        'game-intro-story-label';
+
+
+    storyLabel.textContent =
+        'Situación: ';
+
+
+    const storyText =
+        document.createTextNode(
+            'un fallo en el sistema de contención provocó que varios núcleos de energía quedaran fuera de control. ' +
+            'La instalación fue evacuada, pero el reactor continúa acumulando energía. ' +
+            'Tu misión es entrar, localizar los cinco núcleos activos y desactivarlos antes de que el tiempo llegue a cero.'
+        );
+
+
+    story.append(
+        storyLabel,
+        storyText
+    );
+
+
+    const missionTitle =
+        document.createElement(
+            'div'
+        );
+
+
+    missionTitle.className =
+        'game-intro-section-title';
+
+
+    missionTitle.textContent =
+        'OBJETIVO';
+
+
+    const mission =
+        document.createElement(
+            'p'
+        );
+
+
+    mission.className =
+        'game-intro-mission';
+
+
+    mission.textContent =
+        'Explora la instalación y destruye los 5 núcleos de energía con tus proyectiles antes de que terminen los 3 minutos.';
+
+
+    const startButton =
+        document.createElement(
+            'button'
+        );
+
+
+    startButton.type =
+        'button';
+
+
+    startButton.className =
+        'game-intro-start-button';
+
+
+    startButton.textContent =
+        'COMENZAR MISIÓN';
+
+
+    startButton.addEventListener(
+        'click',
+        () => {
+
+            if (
+                gameStarted
+            ) {
+
+                return;
+
+            }
+
+
+            gameStarted =
+                true;
+
+
+            controls.enabled =
+                true;
+
+
+            startMissionTimer();
+
+
+            startBackgroundMusic();
+
+
+            if (
+                gameStateElement
+            ) {
+
+                gameStateElement.textContent =
+                    'MISIÓN EN CURSO';
+
+            }
+
+
+            introOverlayElement.classList.remove(
+                'is-visible'
+            );
+
+
+            window.setTimeout(
+                () => {
+
+                    if (
+                        introOverlayElement
+                    ) {
+
+                        introOverlayElement.remove();
+
+
+                        introOverlayElement =
+                            null;
+
+                    }
+
+                },
+                360
+            );
+
+
+            console.log(
+                '🎮 Misión iniciada.'
+            );
+
+        }
+    );
+
+
+    panel.append(
+        eyebrow,
+        title,
+        subtitle,
+        story,
+        missionTitle,
+        mission,
+        startButton
+    );
+
+
+    introOverlayElement.appendChild(
+        panel
+    );
+
+
+    document.body.appendChild(
+        introOverlayElement
+    );
+
+
+    requestAnimationFrame(
+        () => {
+
+            introOverlayElement.classList.add(
+                'is-visible'
+            );
+
+        }
+    );
+
+
+    return introOverlayElement;
+
+}
+
+
+// ============================================================
+// MOSTRAR INTRO CUANDO TODO ESTÉ LISTO
+// ============================================================
+
+function tryShowIntroScreen() {
+
+    if (
+        !environmentReady ||
+        !playerReady ||
+        gameStarted ||
+        introOverlayElement
+    ) {
+
+        return;
+
+    }
+
+
+    controls.enabled =
+        false;
+
+
+    // Mostrar 3:00 en el HUD desde la pantalla de introducción,
+    // pero todavía sin iniciar la cuenta regresiva.
+    missionTimeRemaining =
+        GAME_TIME_SECONDS;
+
+
+    updateMissionTimerHUD();
+
+
+    createIntroScreen();
+
+
+    if (
+        gameStateElement
+    ) {
+
+        gameStateElement.textContent =
+            'LISTO PARA INICIAR';
+
+    }
+
+
+    // Ocultar la pantalla de carga solamente cuando
+    // escenario, personaje, física y misión estén listos.
+    window.setTimeout(
+        () => {
+
+            loadingScreen.classList.add(
+                'hidden'
+            );
+
+        },
+        250
+    );
+
+}
+
+
+// ============================================================
+// CREAR HUD DEL TIEMPO
+// ============================================================
+
+function createMissionTimerHUD() {
+
+    if (
+        missionTimerElement
+    ) {
+
+        return missionTimerElement;
+
+    }
+
+
+    // --------------------------------------------------------
+    // PRIMERO: IDs comunes para el tiempo del HUD.
+    // --------------------------------------------------------
+
+    const directSelectors =
+        [
+            '#game-time',
+            '#timer',
+            '#time',
+            '#hud-time',
+            '[data-hud-time]'
+        ];
+
+
+    for (
+        const selector of directSelectors
+    ) {
+
+        const candidate =
+            document.querySelector(
+                selector
+            );
+
+
+        if (
+            candidate
+        ) {
+
+            missionTimerElement =
+                candidate;
+
+
+            return missionTimerElement;
+
+        }
+
+    }
+
+
+    // --------------------------------------------------------
+    // RESPALDO:
+    // buscar dentro de los elementos .hud-item el que tenga
+    // una etiqueta TIME o TIEMPO y usar su último valor.
+    // --------------------------------------------------------
+
+    const hudItems =
+        document.querySelectorAll(
+            '.hud-item'
+        );
+
+
+    for (
+        const item of hudItems
+    ) {
+
+        const children =
+            Array.from(
+                item.children
+            );
+
+
+        if (
+            children.length <
+                2
+        ) {
+
+            continue;
+
+        }
+
+
+        const label =
+            (
+                children[0].textContent ||
+                ''
+            )
+                .trim()
+                .toUpperCase();
+
+
+        if (
+            label !== 'TIME' &&
+            label !== 'TIEMPO'
+        ) {
+
+            continue;
+
+        }
+
+
+        missionTimerElement =
+            children[
+                children.length - 1
+            ];
+
+
+        return missionTimerElement;
+
+    }
+
+
+    console.warn(
+        '⚠️ No se encontró el indicador de tiempo del HUD superior.'
+    );
+
+
+    return null;
+
+}
+
+
+// ============================================================
+// FORMATEAR TIEMPO
+// ============================================================
+
+function formatMissionTime(
+    seconds
+) {
+
+    const safeSeconds =
+        Math.max(
+            0,
+            Math.ceil(
+                seconds
+            )
+        );
+
+
+    const minutes =
+        Math.floor(
+            safeSeconds / 60
+        );
+
+
+    const remainingSeconds =
+        safeSeconds % 60;
+
+
+    return (
+        String(
+            minutes
+        ) +
+        ':' +
+        String(
+            remainingSeconds
+        ).padStart(
+            2,
+            '0'
+        )
+    );
+
+}
+
+
+// ============================================================
+// ACTUALIZAR HUD
+// ============================================================
+
+function updateMissionTimerHUD() {
+
+    const element =
+        createMissionTimerHUD();
+
+
+    if (
+        !element
+    ) {
+
+        return;
+
+    }
+
+
+    element.textContent =
+        formatMissionTime(
+            missionTimeRemaining
+        );
+
+
+    element.classList.toggle(
+
+        'hud-time-danger',
+
+        missionTimeRemaining <=
+            60
+
+    );
+
+}
+
+
+// ============================================================
+// INICIAR CUENTA REGRESIVA
+// ============================================================
+
+function startMissionTimer() {
+
+    if (
+        missionTimerStarted ||
+        gameOver
+    ) {
+
+        return;
+
+    }
+
+
+    missionTimeRemaining =
+        GAME_TIME_SECONDS;
+
+
+    missionTimerStarted =
+        true;
+
+
+    createMissionTimerHUD();
+
+
+    updateMissionTimerHUD();
+
+
+    if (
+        gameStateElement
+    ) {
+
+        gameStateElement.textContent =
+            'MISIÓN EN CURSO';
+
+    }
+
+
+    console.log(
+        `⏱️ Temporizador iniciado: ${formatMissionTime(
+            missionTimeRemaining
+        )}`
+    );
+
+}
+
+
+// ============================================================
+// PANTALLA DE DERROTA
+// ============================================================
+
+function showDefeatScreen() {
+
+    if (
+        defeatOverlayElement
+    ) {
+
+        return;
+
+    }
+
+
+    gameOver =
+        true;
+
+
+    stopBackgroundMusic();
+
+
+    missionTimeRemaining =
+        0;
+
+
+    updateMissionTimerHUD();
+
+
+    if (
+        gameStateElement
+    ) {
+
+        gameStateElement.textContent =
+            'DERROTA';
+
+    }
+
+
+    defeatOverlayElement =
+        document.createElement(
+            'div'
+        );
+
+
+    defeatOverlayElement.id =
+        'defeat-overlay';
+
+
+    defeatOverlayElement.className =
+        'game-result-overlay game-result-overlay--defeat';
+
+
+    const panel =
+        document.createElement(
+            'div'
+        );
+
+
+    panel.className =
+        'game-result-panel game-result-panel--defeat';
+
+
+    const smallTitle =
+        document.createElement(
+            'div'
+        );
+
+
+    smallTitle.className =
+        'game-result-eyebrow game-result-eyebrow--defeat';
+
+
+    smallTitle.textContent =
+        'OPERACIÓN: REACTOR';
+
+
+    const title =
+        document.createElement(
+            'h2'
+        );
+
+
+    title.className =
+        'game-result-title';
+
+
+    title.textContent =
+        'TIEMPO AGOTADO';
+
+
+    const message =
+        document.createElement(
+            'p'
+        );
+
+
+    message.className =
+        'game-result-message';
+
+
+    message.textContent =
+        'No lograste desactivar los cinco núcleos antes de que el reactor llegara a su límite.';
+
+
+    const restartButton =
+        document.createElement(
+            'button'
+        );
+
+
+    restartButton.type =
+        'button';
+
+
+    restartButton.className =
+        'game-result-button game-result-button--defeat';
+
+
+    restartButton.textContent =
+        'REINTENTAR';
+
+
+    restartButton.addEventListener(
+        'click',
+        () => {
+
+            window.location.reload();
+
+        }
+    );
+
+
+    panel.append(
+        smallTitle,
+        title,
+        message,
+        restartButton
+    );
+
+
+    defeatOverlayElement.appendChild(
+        panel
+    );
+
+
+    document.body.appendChild(
+        defeatOverlayElement
+    );
+
+
+    requestAnimationFrame(
+        () => {
+
+            defeatOverlayElement.classList.add(
+                'is-visible'
+            );
+
+        }
+    );
+
+
+    console.log(
+        '❌ Tiempo agotado. Misión fallida.'
+    );
+
+}
+
+
+// ============================================================
+// ACTUALIZAR TEMPORIZADOR
+// ============================================================
+
+function updateMissionTimer(
+    deltaTime
+) {
+
+    if (
+        !gameStarted ||
+        !missionTimerStarted ||
+        gameOver ||
+        isMissionComplete()
+    ) {
+
+        return;
+
+    }
+
+
+    missionTimeRemaining -=
+        deltaTime;
+
+
+    if (
+        missionTimeRemaining <=
+            0
+    ) {
+
+        missionTimeRemaining =
+            0;
+
+
+        updateMissionTimerHUD();
+
+
+        showDefeatScreen();
+
+
+        return;
+
+    }
+
+
+    updateMissionTimerHUD();
+
+}
+
 // ============================================================
 
 // CARGAR ESCENARIO GLB
@@ -845,6 +1797,17 @@ function loadEnvironment() {
                             player
                         );
 
+
+                        // -------------------------------------
+                        // JUGADOR LISTO PARA LA PANTALLA INICIAL
+                        // -------------------------------------
+
+                        playerReady =
+                            true;
+
+
+                        tryShowIntroScreen();
+
                         // -------------------------------------
 // CÁMARA EN TERCERA PERSONA
 // -------------------------------------
@@ -981,23 +1944,14 @@ snapCameraBehindPlayer(
 
             gameStateElement.textContent =
 
-                'ESCENARIO LISTO';
+                'PREPARANDO MISIÓN';
 
-            setTimeout(
 
-                () => {
+            environmentReady =
+                true;
 
-                    loadingScreen.classList.add(
 
-                        'hidden'
-
-                    );
-
-                },
-
-                500
-
-            );
+            tryShowIntroScreen();
 
         },
 
@@ -2581,6 +3535,28 @@ function animate() {
 
         timer.getDelta();
 
+
+    // --------------------------------------------------------
+    // TEMPORIZADOR DE LA MISIÓN
+    // --------------------------------------------------------
+
+    updateMissionTimer(
+        deltaTime
+    );
+
+
+    // --------------------------------------------------------
+    // DETENER MÚSICA AL COMPLETAR LA MISIÓN
+    // --------------------------------------------------------
+
+    if (
+        isMissionComplete()
+    ) {
+
+        stopBackgroundMusic();
+
+    }
+
     // --------------------------------------------------------
 
     // FÍSICA
@@ -2590,77 +3566,82 @@ function animate() {
     stepPhysics();
 
     // --------------------------------------------------------
-
-    // PERSONAJE
-
+    // PERSONAJE / GAMEPLAY
     // --------------------------------------------------------
 
-    let activePlayer;
+    let activePlayer =
+        getPlayer();
 
 
     if (
-        isStairTransitionActive()
+        gameStarted &&
+        !isMissionComplete() &&
+        !gameOver
     ) {
 
-        // Durante la transición de escaleras
-        // bloqueamos WASD temporalmente.
-        activePlayer =
-            getPlayer();
+        if (
+            isStairTransitionActive()
+        ) {
 
-    } else {
+            activePlayer =
+                getPlayer();
 
-        activePlayer =
-            updatePlayer(
+        } else {
 
-                deltaTime,
+            activePlayer =
+                updatePlayer(
 
-                camera
+                    deltaTime,
 
-            );
+                    camera
+
+                );
+
+        }
+
+
+        // ----------------------------------------------------
+        // ESCALERAS / INTERACCIÓN
+        // ----------------------------------------------------
+
+        updateStairs(
+            activePlayer
+        );
+
+
+        // ----------------------------------------------------
+        // PUERTAS / INTERACCIÓN
+        // ----------------------------------------------------
+
+        updateDoorInteractions(
+            activePlayer
+        );
+
+
+        // ----------------------------------------------------
+        // PROYECTILES
+        // ----------------------------------------------------
+
+        updateProjectiles(
+
+            deltaTime,
+
+            scene
+
+        );
+
+
+        // ----------------------------------------------------
+        // NÚCLEOS DE ENERGÍA
+        // ----------------------------------------------------
+
+        updateCores(
+            deltaTime,
+            scene
+        );
 
     }
 
-
-    // --------------------------------------------------------
-    // ESCALERAS / INTERACCIÓN
-    // --------------------------------------------------------
-
-    updateStairs(
-        activePlayer
-    );
-
-
-    // --------------------------------------------------------
-    // PUERTAS / INTERACCIÓN
-    // --------------------------------------------------------
-
-    updateDoorInteractions(
-        activePlayer
-    );
-
-    // --------------------------------------------------------
-
-    // PROYECTILES
-
-    // --------------------------------------------------------
-
-    updateProjectiles(
-
-        deltaTime,
-
-        scene
-
-    );
-
-
-    // --------------------------------------------------------
-    // NÚCLEOS DE ENERGÍA
-    // --------------------------------------------------------
-
-    updateCores(
-        deltaTime,
-        scene
-    );
 
     // --------------------------------------------------------
 
