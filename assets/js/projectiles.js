@@ -7,130 +7,615 @@ import {
 
 
 // ============================================================
-// CONFIGURACIÓN
+// CONFIGURACIÓN DEL PROYECTIL
 // ============================================================
 
+// Tamaño de la pelota.
 const PROJECTILE_RADIUS =
-    0.12;
+    0.07;
 
-const PROJECTILE_SPEED =
-    13;
 
+// Tiempo de vida del proyectil.
 const PROJECTILE_LIFETIME =
     5;
 
 
+// Separación al salir de las manos.
+//
+// Evita que el collider aparezca
+// exactamente dentro del personaje.
+const PROJECTILE_RELEASE_OFFSET =
+    0.22;
+
+
 // ============================================================
-// PROYECTILES ACTIVOS
+// FÍSICA
 // ============================================================
 
-const projectiles = [];
+// Gravedad del proyectil.
+//
+// 1 = gravedad normal.
+// 2 = el doble de gravedad.
+const PROJECTILE_GRAVITY_SCALE =
+    2;
+
+
+// Densidad utilizada por Rapier
+// para calcular la masa.
+const PROJECTILE_DENSITY =
+    2;
+
+
+// Gravedad base del mundo.
+const WORLD_GRAVITY =
+    9.81;
+
+
+// ============================================================
+// SISTEMA DE APUNTADO
+// ============================================================
+
+// Distancia máxima que puede buscar
+// la mira dentro del escenario.
+const AIM_MAX_DISTANCE =
+    25;
+
+
+// Tiempo que intentará tardar la pelota
+// en llegar al punto de la mira.
+//
+// Menor:
+// lanzamiento rápido/directo.
+//
+// Mayor:
+// lanzamiento más lento y arqueado.
+const PROJECTILE_FLIGHT_TIME =
+    0.85;
+
+
+// ============================================================
+// PROYECTILES
+// ============================================================
+
+const projectiles =
+    [];
+
+
+let heldProjectile =
+    null;
 
 
 // ============================================================
 // VECTORES TEMPORALES
 // ============================================================
 
-const shootDirection =
+const rightHandPosition =
     new THREE.Vector3();
 
-const spawnPosition =
+const leftHandPosition =
+    new THREE.Vector3();
+
+const fingerPosition =
+    new THREE.Vector3();
+
+const heldPosition =
+    new THREE.Vector3();
+
+
+// Apuntado
+const cameraWorldPosition =
+    new THREE.Vector3();
+
+const aimDirection =
+    new THREE.Vector3();
+
+const aimTarget =
+    new THREE.Vector3();
+
+
+// Lanzamiento
+const launchDirection =
+    new THREE.Vector3();
+
+const launchVelocity =
     new THREE.Vector3();
 
 
 // ============================================================
-// CREAR PROYECTIL
+// UTILIDADES DEL RIG
 // ============================================================
 
-export function createProjectile(
-    scene,
-    player,
-    camera
+function normalizeRigName(
+    name = ''
 ) {
 
+    return name
+        .toLowerCase()
+        .replace(
+            /[^a-z0-9]/g,
+            ''
+        );
+
+}
+
+
+function isFingerName(
+    name
+) {
+
+    return (
+        name.includes('thumb') ||
+        name.includes('index') ||
+        name.includes('middle') ||
+        name.includes('ring') ||
+        name.includes('pinky') ||
+        name.includes('little')
+    );
+
+}
+
+
+// ============================================================
+// BUSCAR MANO DERECHA
+// ============================================================
+
+function findRightHand(
+    player
+) {
+
+    let result =
+        null;
+
+
+    const exactNames =
+        new Set([
+
+            'mixamorigrighthand',
+            'righthand',
+            'handright',
+            'handr',
+            'rhand',
+            'rightwrist',
+            'rwrist',
+            'bip01rhand'
+
+        ]);
+
+
+    // ========================================================
+    // NOMBRE EXACTO
+    // ========================================================
+
+    player.traverse(
+        (object) => {
+
+            if (
+                result
+            ) {
+
+                return;
+
+            }
+
+
+            const name =
+                normalizeRigName(
+                    object.name
+                );
+
+
+            if (
+                exactNames.has(
+                    name
+                )
+            ) {
+
+                result =
+                    object;
+
+            }
+
+        }
+    );
+
+
     if (
-        !scene ||
-        !player ||
-        !camera
+        result
     ) {
 
-        return null;
+        console.log(
+            '✅ Mano derecha encontrada:',
+            result.name
+        );
+
+
+        return result;
 
     }
 
 
-    const physicsWorld =
-        getPhysicsWorld();
+    // ========================================================
+    // BÚSQUEDA FLEXIBLE
+    // ========================================================
 
-    const RAPIER =
-        getRapier();
+    player.traverse(
+        (object) => {
+
+            if (
+                result
+            ) {
+
+                return;
+
+            }
+
+
+            const name =
+                normalizeRigName(
+                    object.name
+                );
+
+
+            if (
+                (
+                    name.includes(
+                        'righthand'
+                    ) ||
+                    name.includes(
+                        'rightwrist'
+                    )
+                ) &&
+                !isFingerName(
+                    name
+                )
+            ) {
+
+                result =
+                    object;
+
+            }
+
+        }
+    );
 
 
     if (
-        !physicsWorld ||
-        !RAPIER
+        result
+    ) {
+
+        console.log(
+            '✅ Mano derecha encontrada automáticamente:',
+            result.name
+        );
+
+
+        return result;
+
+    }
+
+
+    // ========================================================
+    // RESPALDO:
+    // ANTEBRAZO DERECHO
+    // ========================================================
+
+    player.traverse(
+        (object) => {
+
+            if (
+                result
+            ) {
+
+                return;
+
+            }
+
+
+            const name =
+                normalizeRigName(
+                    object.name
+                );
+
+
+            if (
+                name.includes(
+                    'rightforearm'
+                ) ||
+                name.includes(
+                    'rightlowerarm'
+                )
+            ) {
+
+                result =
+                    object;
+
+            }
+
+        }
+    );
+
+
+    if (
+        result
     ) {
 
         console.warn(
-            '⚠️ Rapier todavía no está disponible.'
+            '⚠️ Usando antebrazo derecho como respaldo:',
+            result.name
         );
 
-        return null;
+    }
+
+
+    return result;
+
+}
+
+
+// ============================================================
+// BUSCAR MANO IZQUIERDA
+// ============================================================
+
+function findLeftHand(
+    player
+) {
+
+    let result =
+        null;
+
+
+    const exactNames =
+        new Set([
+
+            'mixamoriglefthand',
+            'lefthand',
+            'handleft',
+            'handl',
+            'lhand',
+            'leftwrist',
+            'lwrist',
+            'bip01lhand'
+
+        ]);
+
+
+    // ========================================================
+    // NOMBRE EXACTO
+    // ========================================================
+
+    player.traverse(
+        (object) => {
+
+            if (
+                result
+            ) {
+
+                return;
+
+            }
+
+
+            const name =
+                normalizeRigName(
+                    object.name
+                );
+
+
+            if (
+                exactNames.has(
+                    name
+                )
+            ) {
+
+                result =
+                    object;
+
+            }
+
+        }
+    );
+
+
+    if (
+        result
+    ) {
+
+        console.log(
+            '✅ Mano izquierda encontrada:',
+            result.name
+        );
+
+
+        return result;
 
     }
 
 
     // ========================================================
-    // DIRECCIÓN DEL DISPARO
-    // ========================================================
-    //
-    // La dirección depende de la cámara.
-    // Esto hace que el proyectil viaje hacia el centro
-    // de la pantalla / crosshair.
-    //
+    // BÚSQUEDA FLEXIBLE
     // ========================================================
 
-    camera.getWorldDirection(
-        shootDirection
+    player.traverse(
+        (object) => {
+
+            if (
+                result
+            ) {
+
+                return;
+
+            }
+
+
+            const name =
+                normalizeRigName(
+                    object.name
+                );
+
+
+            if (
+                (
+                    name.includes(
+                        'lefthand'
+                    ) ||
+                    name.includes(
+                        'leftwrist'
+                    )
+                ) &&
+                !isFingerName(
+                    name
+                )
+            ) {
+
+                result =
+                    object;
+
+            }
+
+        }
     );
 
-    shootDirection.normalize();
 
+    if (
+        result
+    ) {
 
-    // ========================================================
-    // POSICIÓN DE APARICIÓN
-    // ========================================================
-    //
-    // Sale aproximadamente desde el pecho/mano del personaje
-    // y un poco hacia delante.
-    //
-    // ========================================================
-
-    spawnPosition
-        .copy(
-            player.position
+        console.log(
+            '✅ Mano izquierda encontrada automáticamente:',
+            result.name
         );
 
 
-    spawnPosition.y +=
-        1.15;
+        return result;
+
+    }
 
 
-    spawnPosition.addScaledVector(
-        shootDirection,
-        0.9
+    // ========================================================
+    // RESPALDO:
+    // ANTEBRAZO IZQUIERDO
+    // ========================================================
+
+    player.traverse(
+        (object) => {
+
+            if (
+                result
+            ) {
+
+                return;
+
+            }
+
+
+            const name =
+                normalizeRigName(
+                    object.name
+                );
+
+
+            if (
+                name.includes(
+                    'leftforearm'
+                ) ||
+                name.includes(
+                    'leftlowerarm'
+                )
+            ) {
+
+                result =
+                    object;
+
+            }
+
+        }
     );
 
 
-    // ========================================================
-    // MALLA VISUAL
-    // ========================================================
+    if (
+        result
+    ) {
+
+        console.warn(
+            '⚠️ Usando antebrazo izquierdo como respaldo:',
+            result.name
+        );
+
+    }
+
+
+    return result;
+
+}
+
+
+// ============================================================
+// BUSCAR DEDO MEDIO DERECHO
+// ============================================================
+
+function findRightMiddleFinger(
+    player
+) {
+
+    let result =
+        null;
+
+
+    player.traverse(
+        (object) => {
+
+            if (
+                result
+            ) {
+
+                return;
+
+            }
+
+
+            const name =
+                normalizeRigName(
+                    object.name
+                );
+
+
+            if (
+                name.includes(
+                    'righthandmiddle1'
+                ) ||
+                name.includes(
+                    'rightmiddle1'
+                ) ||
+                name.includes(
+                    'middlefinger1r'
+                )
+            ) {
+
+                result =
+                    object;
+
+            }
+
+        }
+    );
+
+
+    return result;
+
+}
+
+
+// ============================================================
+// CREAR PELOTA VISUAL
+// ============================================================
+
+function createProjectileMesh() {
 
     const geometry =
         new THREE.SphereGeometry(
             PROJECTILE_RADIUS,
-            16,
-            16
+            18,
+            18
         );
 
 
@@ -144,10 +629,10 @@ export function createProjectile(
                 0x20ff80,
 
             emissiveIntensity:
-                2,
+                2.5,
 
             roughness:
-                0.3,
+                0.25,
 
             metalness:
                 0.1
@@ -162,13 +647,73 @@ export function createProjectile(
         );
 
 
-    mesh.position.copy(
-        spawnPosition
-    );
-
-
     mesh.castShadow =
         true;
+
+
+    return mesh;
+
+}
+
+
+// ============================================================
+// CREAR PELOTA ENTRE LAS MANOS
+// ============================================================
+
+export function createHeldProjectile(
+    scene,
+    player
+) {
+
+    if (
+        !scene ||
+        !player
+    ) {
+
+        return null;
+
+    }
+
+
+    // No crear otra mientras
+    // exista una sostenida.
+    if (
+        heldProjectile
+    ) {
+
+        return heldProjectile;
+
+    }
+
+
+    // ========================================================
+    // BUSCAR MANOS
+    // ========================================================
+
+    const rightHand =
+        findRightHand(
+            player
+        );
+
+
+    const leftHand =
+        findLeftHand(
+            player
+        );
+
+
+    const rightMiddleFinger =
+        findRightMiddleFinger(
+            player
+        );
+
+
+    // ========================================================
+    // CREAR PELOTA
+    // ========================================================
+
+    const mesh =
+        createProjectileMesh();
 
 
     scene.add(
@@ -176,17 +721,677 @@ export function createProjectile(
     );
 
 
+    heldProjectile = {
+
+        mesh,
+
+        player,
+
+        rightHand,
+
+        leftHand,
+
+        rightMiddleFinger
+
+    };
+
+
+    // Colocarla inmediatamente.
+    updateHeldProjectile();
+
+
+    if (
+        rightHand &&
+        leftHand
+    ) {
+
+        console.log(
+            '🟢 Proyectil colocado entre ambas manos'
+        );
+
+    } else if (
+        rightHand
+    ) {
+
+        console.log(
+            '🟢 Proyectil colocado en la mano derecha'
+        );
+
+    } else if (
+        leftHand
+    ) {
+
+        console.log(
+            '🟢 Proyectil colocado en la mano izquierda'
+        );
+
+    } else {
+
+        console.warn(
+            '🟡 No se encontraron las manos. Usando posición de respaldo.'
+        );
+
+    }
+
+
+    return heldProjectile;
+
+}
+
+
+// ============================================================
+// ACTUALIZAR PELOTA EN LAS MANOS
+// ============================================================
+
+function updateHeldProjectile() {
+
+    if (
+        !heldProjectile
+    ) {
+
+        return;
+
+    }
+
+
+    const {
+
+        mesh,
+
+        player,
+
+        rightHand,
+
+        leftHand,
+
+        rightMiddleFinger
+
+    } =
+        heldProjectile;
+
+
     // ========================================================
-    // CUERPO FÍSICO
+    // DOS MANOS
+    // ========================================================
+
+    if (
+        rightHand &&
+        leftHand
+    ) {
+
+        rightHand.getWorldPosition(
+            rightHandPosition
+        );
+
+
+        leftHand.getWorldPosition(
+            leftHandPosition
+        );
+
+
+        // Punto medio entre ambas manos.
+        heldPosition
+            .copy(
+                rightHandPosition
+            )
+            .add(
+                leftHandPosition
+            )
+            .multiplyScalar(
+                0.5
+            );
+
+
+        // Pequeño ajuste visual.
+        heldPosition.y +=
+            0.025;
+
+
+        mesh.position.copy(
+            heldPosition
+        );
+
+
+        return;
+
+    }
+
+
+    // ========================================================
+    // SOLO MANO DERECHA
+    // ========================================================
+
+    if (
+        rightHand
+    ) {
+
+        rightHand.getWorldPosition(
+            rightHandPosition
+        );
+
+
+        if (
+            rightMiddleFinger
+        ) {
+
+            rightMiddleFinger.getWorldPosition(
+                fingerPosition
+            );
+
+
+            heldPosition
+                .copy(
+                    rightHandPosition
+                )
+                .lerp(
+                    fingerPosition,
+                    0.55
+                );
+
+        } else {
+
+            heldPosition.copy(
+                rightHandPosition
+            );
+
+        }
+
+
+        mesh.position.copy(
+            heldPosition
+        );
+
+
+        return;
+
+    }
+
+
+    // ========================================================
+    // SOLO MANO IZQUIERDA
+    // ========================================================
+
+    if (
+        leftHand
+    ) {
+
+        leftHand.getWorldPosition(
+            leftHandPosition
+        );
+
+
+        mesh.position.copy(
+            leftHandPosition
+        );
+
+
+        return;
+
+    }
+
+
+    // ========================================================
+    // RESPALDO
+    // ========================================================
+
+    if (
+        player
+    ) {
+
+        heldPosition
+            .set(
+                0,
+                1.15,
+                0.30
+            )
+            .applyQuaternion(
+                player.quaternion
+            )
+            .add(
+                player.position
+            );
+
+
+        mesh.position.copy(
+            heldPosition
+        );
+
+    }
+
+}
+
+
+// ============================================================
+// OBTENER OBJETIVO DE LA MIRA
+// ============================================================
+//
+// La mira está en el centro de la pantalla.
+//
+// Como la cámara también apunta exactamente desde
+// el centro de la pantalla, usamos:
+// camera.getWorldDirection()
+//
+// Después Rapier busca qué parte del escenario
+// está debajo de esa mira.
+// ============================================================
+
+function getCrosshairTarget(
+    camera
+) {
+
+    const physicsWorld =
+        getPhysicsWorld();
+
+
+    const RAPIER =
+        getRapier();
+
+
+    // ========================================================
+    // POSICIÓN DE LA CÁMARA
+    // ========================================================
+
+    camera.getWorldPosition(
+        cameraWorldPosition
+    );
+
+
+    // ========================================================
+    // DIRECCIÓN EXACTA DE LA MIRA
+    // ========================================================
+
+    camera.getWorldDirection(
+        aimDirection
+    );
+
+
+    aimDirection.normalize();
+
+
+    // ========================================================
+    // SI RAPIER AÚN NO ESTÁ DISPONIBLE
+    // ========================================================
+
+    if (
+        !physicsWorld ||
+        !RAPIER
+    ) {
+
+        aimTarget
+            .copy(
+                cameraWorldPosition
+            )
+            .addScaledVector(
+                aimDirection,
+                AIM_MAX_DISTANCE
+            );
+
+
+        return aimTarget;
+
+    }
+
+
+    // ========================================================
+    // CREAR RAYO DESDE LA CÁMARA
+    // ========================================================
+
+    const ray =
+        new RAPIER.Ray(
+
+            {
+
+                x:
+                    cameraWorldPosition.x,
+
+                y:
+                    cameraWorldPosition.y,
+
+                z:
+                    cameraWorldPosition.z
+
+            },
+
+            {
+
+                x:
+                    aimDirection.x,
+
+                y:
+                    aimDirection.y,
+
+                z:
+                    aimDirection.z
+
+            }
+
+        );
+
+
+    // ========================================================
+    // BUSCAR PARED / PISO / ESCENARIO
+    // ========================================================
+    //
+    // ONLY_FIXED:
+    //
+    // Solo detectamos colliders estáticos.
+    //
+    // Así evitamos que el propio personaje
+    // intercepte la mira.
+    // ========================================================
+
+    const hit =
+        physicsWorld.castRay(
+
+            ray,
+
+            AIM_MAX_DISTANCE,
+
+            true,
+
+            RAPIER.QueryFilterFlags.ONLY_FIXED
+
+        );
+
+
+    // ========================================================
+    // SI LA MIRA TOCA EL ESCENARIO
+    // ========================================================
+
+    if (
+        hit
+    ) {
+
+        aimTarget
+            .copy(
+                cameraWorldPosition
+            )
+            .addScaledVector(
+                aimDirection,
+                hit.timeOfImpact
+            );
+
+
+        return aimTarget;
+
+    }
+
+
+    // ========================================================
+    // SI NO TOCA NADA
+    // ========================================================
+
+    aimTarget
+        .copy(
+            cameraWorldPosition
+        )
+        .addScaledVector(
+            aimDirection,
+            AIM_MAX_DISTANCE
+        );
+
+
+    return aimTarget;
+
+}
+
+
+// ============================================================
+// CALCULAR VELOCIDAD BALÍSTICA
+// ============================================================
+//
+// Queremos:
+//
+//                  ✚
+//               objetivo
+//                  |
+//             🟢
+//          ↗
+//       🟢
+//    ↗
+// 🤾
+//
+// La fórmula calcula qué velocidad inicial
+// necesita la pelota para alcanzar el objetivo
+// después de PROJECTILE_FLIGHT_TIME segundos.
+// ============================================================
+
+function calculateLaunchVelocity(
+    startPosition,
+    targetPosition
+) {
+
+    const time =
+        PROJECTILE_FLIGHT_TIME;
+
+
+    // ========================================================
+    // DESPLAZAMIENTO
+    // ========================================================
+
+    const deltaX =
+        targetPosition.x -
+        startPosition.x;
+
+
+    const deltaY =
+        targetPosition.y -
+        startPosition.y;
+
+
+    const deltaZ =
+        targetPosition.z -
+        startPosition.z;
+
+
+    // ========================================================
+    // GRAVEDAD REAL QUE AFECTA A LA PELOTA
+    // ========================================================
+
+    const gravity =
+        WORLD_GRAVITY *
+        PROJECTILE_GRAVITY_SCALE;
+
+
+    // ========================================================
+    // VELOCIDAD HORIZONTAL
+    // ========================================================
+
+    launchVelocity.x =
+        deltaX /
+        time;
+
+
+    launchVelocity.z =
+        deltaZ /
+        time;
+
+
+    // ========================================================
+    // VELOCIDAD VERTICAL
+    // ========================================================
+    //
+    // y = y0 + vy*t - 1/2*g*t²
+    //
+    // despejamos vy.
+    // ========================================================
+
+    launchVelocity.y =
+        (
+            deltaY +
+            (
+                0.5 *
+                gravity *
+                time *
+                time
+            )
+        ) /
+        time;
+
+
+    return launchVelocity;
+
+}
+
+
+// ============================================================
+// SOLTAR PROYECTIL
+// ============================================================
+
+export function releaseHeldProjectile(
+    scene,
+    camera
+) {
+
+    if (
+        !heldProjectile ||
+        !scene ||
+        !camera
+    ) {
+
+        return null;
+
+    }
+
+
+    const physicsWorld =
+        getPhysicsWorld();
+
+
+    const RAPIER =
+        getRapier();
+
+
+    if (
+        !physicsWorld ||
+        !RAPIER
+    ) {
+
+        console.warn(
+            '⚠️ Rapier todavía no está disponible.'
+        );
+
+
+        return null;
+
+    }
+
+
+    const mesh =
+        heldProjectile.mesh;
+
+
+    // ========================================================
+    // POSICIÓN EXACTA DE LAS MANOS
+    // ========================================================
+
+    updateHeldProjectile();
+
+
+    // ========================================================
+    // ENCONTRAR PUNTO DE LA MIRA
+    // ========================================================
+
+    const targetPosition =
+        getCrosshairTarget(
+            camera
+        );
+
+
+    // ========================================================
+    // POSICIÓN DE SALIDA
+    // ========================================================
+
+    const spawnPosition =
+        mesh.position.clone();
+
+
+    // ========================================================
+    // DIRECCIÓN DESDE LAS MANOS HACIA LA MIRA
+    // ========================================================
+
+    launchDirection
+        .copy(
+            targetPosition
+        )
+        .sub(
+            spawnPosition
+        );
+
+
+    if (
+        launchDirection.lengthSq() >
+        0.000001
+    ) {
+
+        launchDirection.normalize();
+
+    } else {
+
+        camera.getWorldDirection(
+            launchDirection
+        );
+
+
+        launchDirection.normalize();
+
+    }
+
+
+    // ========================================================
+    // ALEJAR UN POCO DEL PERSONAJE
+    // ========================================================
+
+    spawnPosition.addScaledVector(
+        launchDirection,
+        PROJECTILE_RELEASE_OFFSET
+    );
+
+
+    mesh.position.copy(
+        spawnPosition
+    );
+
+
+    // ========================================================
+    // VELOCIDAD PARA LLEGAR A LA MIRA
+    // ========================================================
+
+    const velocity =
+        calculateLaunchVelocity(
+            spawnPosition,
+            targetPosition
+        );
+
+
+    // ========================================================
+    // CREAR RIGID BODY
     // ========================================================
 
     const rigidBodyDescription =
         RAPIER.RigidBodyDesc
             .dynamic()
+
             .setTranslation(
                 spawnPosition.x,
                 spawnPosition.y,
                 spawnPosition.z
+            )
+
+            .setGravityScale(
+                PROJECTILE_GRAVITY_SCALE
+            )
+
+            .setLinearDamping(
+                0.02
+            )
+
+            .setAngularDamping(
+                0.05
+            )
+
+            .setCcdEnabled(
+                true
             );
 
 
@@ -205,11 +1410,17 @@ export function createProjectile(
             .ball(
                 PROJECTILE_RADIUS
             )
-            .setRestitution(
-                0.15
+
+            .setDensity(
+                PROJECTILE_DENSITY
             )
+
+            .setRestitution(
+                0.30
+            )
+
             .setFriction(
-                0.2
+                0.25
             );
 
 
@@ -221,23 +1432,42 @@ export function createProjectile(
 
 
     // ========================================================
-    // VELOCIDAD
+    // VELOCIDAD CALCULADA
     // ========================================================
 
     rigidBody.setLinvel(
         {
 
             x:
-                shootDirection.x *
-                PROJECTILE_SPEED,
+                velocity.x,
 
             y:
-                shootDirection.y *
-                PROJECTILE_SPEED,
+                velocity.y,
 
             z:
-                shootDirection.z *
-                PROJECTILE_SPEED
+                velocity.z
+
+        },
+
+        true
+    );
+
+
+    // ========================================================
+    // GIRO
+    // ========================================================
+
+    rigidBody.setAngvel(
+        {
+
+            x:
+                2.5,
+
+            y:
+                1.0,
+
+            z:
+                3.5
 
         },
 
@@ -268,12 +1498,82 @@ export function createProjectile(
     );
 
 
+    // ========================================================
+    // YA NO ESTÁ EN LAS MANOS
+    // ========================================================
+
+    heldProjectile =
+        null;
+
+
     console.log(
-        '🟢 Proyectil creado'
+        '🎯 Objetivo de la mira:',
+        targetPosition
+    );
+
+
+    console.log(
+        '🤾 Velocidad calculada:',
+        velocity
+    );
+
+
+    console.log(
+        '🟢 Proyectil lanzado hacia la mira'
     );
 
 
     return projectile;
+
+}
+
+
+// ============================================================
+// CANCELAR PELOTA SOSTENIDA
+// ============================================================
+
+export function cancelHeldProjectile(
+    scene
+) {
+
+    if (
+        !heldProjectile
+    ) {
+
+        return;
+
+    }
+
+
+    const mesh =
+        heldProjectile.mesh;
+
+
+    scene.remove(
+        mesh
+    );
+
+
+    if (
+        mesh.geometry
+    ) {
+
+        mesh.geometry.dispose();
+
+    }
+
+
+    if (
+        mesh.material
+    ) {
+
+        mesh.material.dispose();
+
+    }
+
+
+    heldProjectile =
+        null;
 
 }
 
@@ -291,6 +1591,13 @@ export function updateProjectiles(
         getPhysicsWorld();
 
 
+    // ========================================================
+    // PELOTA TODAVÍA EN LAS MANOS
+    // ========================================================
+
+    updateHeldProjectile();
+
+
     if (
         !physicsWorld
     ) {
@@ -300,12 +1607,16 @@ export function updateProjectiles(
     }
 
 
-    // Recorremos desde el último hacia el primero
-    // porque algunos pueden ser eliminados.
+    // ========================================================
+    // PROYECTILES LANZADOS
+    // ========================================================
 
     for (
-        let i = projectiles.length - 1;
+        let i =
+            projectiles.length - 1;
+
         i >= 0;
+
         i--
     ) {
 
@@ -314,7 +1625,7 @@ export function updateProjectiles(
 
 
         // ====================================================
-        // SINCRONIZAR THREE.JS CON RAPIER
+        // POSICIÓN RAPIER -> THREE.JS
         // ====================================================
 
         const position =
@@ -327,6 +1638,10 @@ export function updateProjectiles(
             position.z
         );
 
+
+        // ====================================================
+        // ROTACIÓN RAPIER -> THREE.JS
+        // ====================================================
 
         const rotation =
             projectile.rigidBody.rotation();
@@ -347,10 +1662,6 @@ export function updateProjectiles(
         projectile.lifetime -=
             deltaTime;
 
-
-        // ====================================================
-        // ELIMINAR SI CADUCÓ
-        // ====================================================
 
         if (
             projectile.lifetime <= 0
@@ -385,6 +1696,10 @@ function removeProjectile(
     physicsWorld
 ) {
 
+    // ========================================================
+    // THREE.JS
+    // ========================================================
+
     if (
         projectile.mesh
     ) {
@@ -394,7 +1709,13 @@ function removeProjectile(
         );
 
 
-        projectile.mesh.geometry.dispose();
+        if (
+            projectile.mesh.geometry
+        ) {
+
+            projectile.mesh.geometry.dispose();
+
+        }
 
 
         if (
@@ -407,6 +1728,10 @@ function removeProjectile(
 
     }
 
+
+    // ========================================================
+    // RAPIER
+    // ========================================================
 
     if (
         projectile.rigidBody
@@ -422,7 +1747,7 @@ function removeProjectile(
 
 
 // ============================================================
-// OBTENER PROYECTILES ACTIVOS
+// OBTENER PROYECTILES
 // ============================================================
 
 export function getProjectiles() {
