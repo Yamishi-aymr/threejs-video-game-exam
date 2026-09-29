@@ -11,74 +11,106 @@ import {
 
 
 // ============================================================
-// CONFIGURACIÓN DEL NÚCLEO
+// CONFIGURACIÓN DE LA MISIÓN
 // ============================================================
 
-// Tamaño físico/visual aproximado.
+// Cantidad de núcleos que aparecerán en cada partida.
+const TOTAL_CORES =
+    5;
+
+
+// Tamaño visual/físico del núcleo.
 const CORE_RADIUS =
     0.38;
 
 
-// Distancia a la que consideramos que
-// un proyectil golpeó el núcleo.
-//
-// Debe ser un poco mayor que CORE_RADIUS
-// porque el proyectil también tiene radio.
+// Distancia para detectar el impacto del proyectil.
 const CORE_HIT_DISTANCE =
     0.52;
 
 
-// Distancia del núcleo de prueba frente al jugador.
-const TEST_CORE_DISTANCE =
-    2.8;
-
-
-// Altura sobre la posición base del jugador.
-const TEST_CORE_HEIGHT =
-    0.95;
+// Las coordenadas fueron tomadas estando parado
+// sobre un lugar accesible.
+//
+// Sumamos esta altura para que el núcleo quede flotando
+// frente al jugador y no enterrado en el piso.
+const CORE_VERTICAL_OFFSET =
+    0.85;
 
 
 // ============================================================
-// BÚSQUEDA DE POSICIÓN SEGURA
+// POSICIONES DISPONIBLES
+// ============================================================
+//
+// Tenemos 8 lugares comprobados manualmente.
+//
+// En cada recarga se eligen 5 SIN REPETIR.
+//
+// Los IDs representan el punto registrado,
+// no necesariamente el orden en que aparecerá
+// dentro de la misión.
 // ============================================================
 
-// Distancias que probaremos desde el personaje.
-const SAFE_SPAWN_DISTANCES =
+const CORE_POSITIONS =
     [
-        2.8,
-        2.4,
-        2.0,
-        1.6
+
+        {
+            id: 1,
+            x: 11.68,
+            y: 6.94,
+            z: 15.97
+        },
+
+        {
+            id: 2,
+            x: -12.87,
+            y: 6.93,
+            z: 10.80
+        },
+
+        {
+            id: 3,
+            x: -1.95,
+            y: 6.95,
+            z: 4.15
+        },
+
+        {
+            id: 4,
+            x: -21.70,
+            y: 3.73,
+            z: 2.37
+        },
+
+        {
+            id: 5,
+            x: -21.13,
+            y: 3.63,
+            z: 15.89
+        },
+
+        {
+            id: 6,
+            x: -7.44,
+            y: 3.63,
+            z: 2.27
+        },
+
+        {
+            id: 7,
+            x: -5.35,
+            y: 3.63,
+            z: -11.82
+        },
+
+        {
+            id: 8,
+            x: 2.61,
+            y: 3.63,
+            z: -3.65
+        }
+
     ];
-
-
-// Ángulos relativos a la dirección frontal.
-// Primero intentamos enfrente y después alrededor.
-const SAFE_SPAWN_ANGLES =
-    [
-        0,
-        Math.PI / 4,
-        -Math.PI / 4,
-        Math.PI / 2,
-        -Math.PI / 2,
-        Math.PI * 0.75,
-        -Math.PI * 0.75
-    ];
-
-
-// Espacio mínimo alrededor del núcleo.
-const CORE_WALL_CLEARANCE =
-    CORE_RADIUS + 0.20;
-
-
-// Altura desde donde comprobamos el piso.
-const FLOOR_RAY_HEIGHT =
-    1.5;
-
-
-// Distancia máxima hacia abajo para encontrar piso.
-const FLOOR_CHECK_DISTANCE =
-    3.5;
 
 
 // ============================================================
@@ -88,62 +120,249 @@ const FLOOR_CHECK_DISTANCE =
 const cores =
     [];
 
+
 let destroyedCoreCount =
     0;
 
 
+let coreHudElement =
+    null;
+
+
+// Posiciones elegidas para la partida actual.
+let selectedCorePositions =
+    [];
+
+
 // ============================================================
-// VECTORES TEMPORALES
+// ELEGIR 5 POSICIONES ALEATORIAS SIN REPETIR
 // ============================================================
 
-const playerForward =
-    new THREE.Vector3();
+function chooseRandomCorePositions() {
 
-const corePosition =
-    new THREE.Vector3();
-
-
-const testDirection =
-    new THREE.Vector3();
-
-const rayDirection =
-    new THREE.Vector3();
-
-const playerRayOrigin =
-    new THREE.Vector3();
-
-const clearanceDirection =
-    new THREE.Vector3();
-
-const safeCandidate =
-    new THREE.Vector3();
+    // Copia para no alterar CORE_POSITIONS.
+    const available =
+        CORE_POSITIONS.map(
+            (position) => ({
+                ...position
+            })
+        );
 
 
-const worldUp =
-    new THREE.Vector3(
+    // Fisher-Yates shuffle.
+    for (
+        let i =
+            available.length - 1;
+
+        i > 0;
+
+        i--
+    ) {
+
+        const randomIndex =
+            Math.floor(
+                Math.random() *
+                (
+                    i + 1
+                )
+            );
+
+
+        const temporary =
+            available[i];
+
+
+        available[i] =
+            available[
+                randomIndex
+            ];
+
+
+        available[
+            randomIndex
+        ] =
+            temporary;
+
+    }
+
+
+    return available.slice(
         0,
-        1,
-        0
+        TOTAL_CORES
     );
+
+}
+
+
+// ============================================================
+// HUD
+// ============================================================
+
+function ensureCoreHUD() {
+
+    if (
+        coreHudElement
+    ) {
+
+        return coreHudElement;
+
+    }
+
+
+    coreHudElement =
+        document.getElementById(
+            'core-counter'
+        );
+
+
+    if (
+        coreHudElement
+    ) {
+
+        return coreHudElement;
+
+    }
+
+
+    coreHudElement =
+        document.createElement(
+            'div'
+        );
+
+
+    coreHudElement.id =
+        'core-counter';
+
+
+    Object.assign(
+        coreHudElement.style,
+        {
+
+            position:
+                'fixed',
+
+            top:
+                '20px',
+
+            right:
+                '20px',
+
+            zIndex:
+                '1000',
+
+            padding:
+                '10px 14px',
+
+            minWidth:
+                '145px',
+
+            border:
+                '1px solid rgba(64, 255, 157, 0.65)',
+
+            borderRadius:
+                '8px',
+
+            background:
+                'rgba(8, 11, 14, 0.82)',
+
+            color:
+                '#d9fff0',
+
+            fontFamily:
+                'system-ui, sans-serif',
+
+            fontSize:
+                '13px',
+
+            fontWeight:
+                '700',
+
+            letterSpacing:
+                '0.08em',
+
+            textAlign:
+                'center',
+
+            boxShadow:
+                '0 0 18px rgba(64, 255, 157, 0.12)',
+
+            backdropFilter:
+                'blur(6px)',
+
+            pointerEvents:
+                'none'
+
+        }
+    );
+
+
+    document.body.appendChild(
+        coreHudElement
+    );
+
+
+    return coreHudElement;
+
+}
+
+
+// ============================================================
+// ACTUALIZAR HUD
+// ============================================================
+
+function updateCoreHUD() {
+
+    const hud =
+        ensureCoreHUD();
+
+
+    if (
+        destroyedCoreCount >=
+        TOTAL_CORES
+    ) {
+
+        hud.textContent =
+            `NÚCLEOS  ${TOTAL_CORES} / ${TOTAL_CORES}  ✓`;
+
+
+        hud.style.borderColor =
+            'rgba(64, 255, 157, 1)';
+
+
+        hud.style.boxShadow =
+            '0 0 24px rgba(64, 255, 157, 0.28)';
+
+
+        return;
+
+    }
+
+
+    hud.textContent =
+        `NÚCLEOS  ${destroyedCoreCount} / ${TOTAL_CORES}`;
+
+}
 
 
 // ============================================================
 // CREAR VISUAL DEL NÚCLEO
 // ============================================================
 
-function createCoreVisual() {
+function createCoreVisual(
+    missionIndex
+) {
 
     const group =
         new THREE.Group();
 
 
     group.name =
-        'EnergyCore';
+        `EnergyCore_${missionIndex + 1}`;
 
 
-    // --------------------------------------------------------
+    // ========================================================
     // ESFERA CENTRAL
-    // --------------------------------------------------------
+    // ========================================================
 
     const sphereGeometry =
         new THREE.SphereGeometry(
@@ -163,7 +382,7 @@ function createCoreVisual() {
                 0x20ff80,
 
             emissiveIntensity:
-                3.0,
+                3,
 
             roughness:
                 0.20,
@@ -190,9 +409,9 @@ function createCoreVisual() {
     );
 
 
-    // --------------------------------------------------------
-    // ANILLO 1
-    // --------------------------------------------------------
+    // ========================================================
+    // ANILLO EXTERIOR
+    // ========================================================
 
     const ringGeometry1 =
         new THREE.TorusGeometry(
@@ -213,7 +432,7 @@ function createCoreVisual() {
                 true,
 
             opacity:
-                0.9
+                0.90
 
         });
 
@@ -234,9 +453,9 @@ function createCoreVisual() {
     );
 
 
-    // --------------------------------------------------------
-    // ANILLO 2
-    // --------------------------------------------------------
+    // ========================================================
+    // ANILLO INTERIOR
+    // ========================================================
 
     const ringGeometry2 =
         new THREE.TorusGeometry(
@@ -278,14 +497,14 @@ function createCoreVisual() {
     );
 
 
-    // --------------------------------------------------------
+    // ========================================================
     // LUZ
-    // --------------------------------------------------------
+    // ========================================================
 
     const light =
         new THREE.PointLight(
             0x40ff9d,
-            3.5,
+            3.2,
             5,
             2
         );
@@ -299,8 +518,15 @@ function createCoreVisual() {
     group.userData.ring1 =
         ring1;
 
+
     group.userData.ring2 =
         ring2;
+
+
+    group.userData.rotationSpeed =
+        0.75 +
+        missionIndex *
+        0.07;
 
 
     return group;
@@ -309,7 +535,17 @@ function createCoreVisual() {
 
 
 // ============================================================
-// CREAR NÚCLEO FÍSICO
+// CREAR SENSOR RAPIER
+// ============================================================
+//
+// El núcleo NO bloquea puertas ni pasillos.
+//
+// Es un sensor cinemático:
+// - el personaje puede atravesarlo;
+// - no se comporta como pared;
+// - los rayos ONLY_FIXED de cámara/mira lo ignoran.
+//
+// El golpe del proyectil se detecta por distancia.
 // ============================================================
 
 function createCorePhysics(
@@ -330,13 +566,18 @@ function createCorePhysics(
     ) {
 
         console.warn(
-            '⚠️ No se pudo crear la física del núcleo.'
+            '⚠️ Rapier no está disponible para crear el sensor del núcleo.'
         );
 
 
         return {
-            rigidBody: null,
-            collider: null
+
+            rigidBody:
+                null,
+
+            collider:
+                null
+
         };
 
     }
@@ -344,7 +585,7 @@ function createCorePhysics(
 
     const rigidBodyDescription =
         RAPIER.RigidBodyDesc
-            .fixed()
+            .kinematicPositionBased()
             .setTranslation(
                 position.x,
                 position.y,
@@ -363,11 +604,8 @@ function createCorePhysics(
             .ball(
                 CORE_RADIUS
             )
-            .setRestitution(
-                0.15
-            )
-            .setFriction(
-                0.35
+            .setSensor(
+                true
             );
 
 
@@ -379,518 +617,37 @@ function createCorePhysics(
 
 
     return {
+
         rigidBody,
+
         collider
+
     };
 
 }
 
 
 // ============================================================
-// COMPROBAR SI EXISTE PISO DEBAJO
+// CREAR UN NÚCLEO
 // ============================================================
 
-function hasFloorBelow(
-    position
-) {
-
-    const physicsWorld =
-        getPhysicsWorld();
-
-    const RAPIER =
-        getRapier();
-
-
-    if (
-        !physicsWorld ||
-        !RAPIER
-    ) {
-
-        return true;
-
-    }
-
-
-    const ray =
-        new RAPIER.Ray(
-
-            {
-                x:
-                    position.x,
-
-                y:
-                    position.y +
-                    FLOOR_RAY_HEIGHT,
-
-                z:
-                    position.z
-            },
-
-            {
-                x: 0,
-                y: -1,
-                z: 0
-            }
-
-        );
-
-
-    const hit =
-        physicsWorld.castRay(
-
-            ray,
-
-            FLOOR_CHECK_DISTANCE,
-
-            true,
-
-            RAPIER.QueryFilterFlags.ONLY_FIXED
-
-        );
-
-
-    return Boolean(
-        hit
-    );
-
-}
-
-
-// ============================================================
-// COMPROBAR LÍNEA ENTRE JUGADOR Y NÚCLEO
-// ============================================================
-//
-// Si existe una pared entre el personaje y la posición
-// candidata, esa posición se descarta.
-// ============================================================
-
-function isPathClear(
-    player,
-    candidate
-) {
-
-    const physicsWorld =
-        getPhysicsWorld();
-
-    const RAPIER =
-        getRapier();
-
-
-    if (
-        !physicsWorld ||
-        !RAPIER
-    ) {
-
-        return true;
-
-    }
-
-
-    playerRayOrigin
-        .copy(
-            player.position
-        );
-
-
-    // Aproximadamente altura del torso.
-    playerRayOrigin.y +=
-        TEST_CORE_HEIGHT;
-
-
-    rayDirection
-        .copy(
-            candidate
-        )
-        .sub(
-            playerRayOrigin
-        );
-
-
-    const distance =
-        rayDirection.length();
-
-
-    if (
-        distance <= 0.001
-    ) {
-
-        return false;
-
-    }
-
-
-    rayDirection.normalize();
-
-
-    const ray =
-        new RAPIER.Ray(
-
-            {
-                x:
-                    playerRayOrigin.x,
-
-                y:
-                    playerRayOrigin.y,
-
-                z:
-                    playerRayOrigin.z
-            },
-
-            {
-                x:
-                    rayDirection.x,
-
-                y:
-                    rayDirection.y,
-
-                z:
-                    rayDirection.z
-            }
-
-        );
-
-
-    const hit =
-        physicsWorld.castRay(
-
-            ray,
-
-            distance,
-
-            true,
-
-            RAPIER.QueryFilterFlags.ONLY_FIXED
-
-        );
-
-
-    // Si no toca ninguna pared/objeto fijo,
-    // el trayecto está libre.
-    return !hit;
-
-}
-
-
-// ============================================================
-// COMPROBAR ESPACIO ALREDEDOR DEL NÚCLEO
-// ============================================================
-//
-// Hacemos rayos cortos hacia cuatro direcciones.
-// Así evitamos colocar el núcleo pegado o metido en una pared.
-// ============================================================
-
-function hasWallClearance(
-    position
-) {
-
-    const physicsWorld =
-        getPhysicsWorld();
-
-    const RAPIER =
-        getRapier();
-
-
-    if (
-        !physicsWorld ||
-        !RAPIER
-    ) {
-
-        return true;
-
-    }
-
-
-    const directions =
-        [
-            [1, 0, 0],
-            [-1, 0, 0],
-            [0, 0, 1],
-            [0, 0, -1]
-        ];
-
-
-    for (
-        const direction of directions
-    ) {
-
-        clearanceDirection.set(
-            direction[0],
-            direction[1],
-            direction[2]
-        );
-
-
-        const ray =
-            new RAPIER.Ray(
-
-                {
-                    x:
-                        position.x,
-
-                    y:
-                        position.y,
-
-                    z:
-                        position.z
-                },
-
-                {
-                    x:
-                        clearanceDirection.x,
-
-                    y:
-                        clearanceDirection.y,
-
-                    z:
-                        clearanceDirection.z
-                }
-
-            );
-
-
-        const hit =
-            physicsWorld.castRay(
-
-                ray,
-
-                CORE_WALL_CLEARANCE,
-
-                true,
-
-                RAPIER.QueryFilterFlags.ONLY_FIXED
-
-            );
-
-
-        if (
-            hit
-        ) {
-
-            return false;
-
-        }
-
-    }
-
-
-    return true;
-
-}
-
-
-// ============================================================
-// BUSCAR POSICIÓN SEGURA
-// ============================================================
-//
-// Orden de búsqueda:
-//
-// 1. enfrente,
-// 2. diagonales,
-// 3. costados,
-// 4. diagonales traseras.
-//
-// Además probamos varias distancias.
-//
-// Una posición solo se acepta si:
-//
-// - hay piso debajo,
-// - no hay una pared entre jugador y núcleo,
-// - no está pegada a otra pared.
-// ============================================================
-
-function findSafeCorePosition(
-    player
-) {
-
-    playerForward.set(
-        0,
-        0,
-        1
-    );
-
-
-    playerForward.applyQuaternion(
-        player.quaternion
-    );
-
-
-    playerForward.y =
-        0;
-
-
-    if (
-        playerForward.lengthSq() >
-        0.000001
-    ) {
-
-        playerForward.normalize();
-
-    } else {
-
-        playerForward.set(
-            0,
-            0,
-            1
-        );
-
-    }
-
-
-    for (
-        const distance of SAFE_SPAWN_DISTANCES
-    ) {
-
-        for (
-            const angle of SAFE_SPAWN_ANGLES
-        ) {
-
-            testDirection
-                .copy(
-                    playerForward
-                )
-                .applyAxisAngle(
-                    worldUp,
-                    angle
-                )
-                .normalize();
-
-
-            safeCandidate
-                .copy(
-                    player.position
-                )
-                .addScaledVector(
-                    testDirection,
-                    distance
-                );
-
-
-            safeCandidate.y =
-                player.position.y +
-                TEST_CORE_HEIGHT;
-
-
-            if (
-                !hasFloorBelow(
-                    safeCandidate
-                )
-            ) {
-
-                continue;
-
-            }
-
-
-            if (
-                !isPathClear(
-                    player,
-                    safeCandidate
-                )
-            ) {
-
-                continue;
-
-            }
-
-
-            if (
-                !hasWallClearance(
-                    safeCandidate
-                )
-            ) {
-
-                continue;
-
-            }
-
-
-            return safeCandidate.clone();
-
-        }
-
-    }
-
-
-    // Último respaldo:
-    // si no encontramos un sitio perfecto,
-    // usamos una posición muy cercana al jugador.
-    const fallback =
-        player.position
-            .clone()
-            .addScaledVector(
-                playerForward,
-                1.2
-            );
-
-
-    fallback.y +=
-        TEST_CORE_HEIGHT;
-
-
-    console.warn(
-        '⚠️ No se encontró una posición completamente libre para el núcleo. Usando respaldo.'
-    );
-
-
-    return fallback;
-
-}
-
-
-// ============================================================
-// CREAR NÚCLEO DE PRUEBA
-// ============================================================
-//
-// Por ahora creamos SOLO UNO.
-//
-// Lo colocamos frente al jugador para comprobar:
-//
-// 1. que se vea,
-// 2. que tenga collider,
-// 3. que el proyectil lo detecte,
-// 4. que desaparezca al recibir el impacto.
-//
-// Cuando esto funcione, lo convertimos en 5 núcleos.
-// ============================================================
-
-export function createTestCore(
+function createCore(
     scene,
-    player
+    positionData,
+    missionIndex
 ) {
 
-    if (
-        !scene ||
-        !player
-    ) {
+    const worldPosition =
+        new THREE.Vector3(
 
-        return null;
+            positionData.x,
 
-    }
+            positionData.y +
+            CORE_VERTICAL_OFFSET,
 
+            positionData.z
 
-    // Evitar duplicarlo si la función se llama dos veces.
-    if (
-        cores.length > 0
-    ) {
-
-        return cores[0];
-
-    }
-
-
-    // ========================================================
-    // POSICIÓN SEGURA DEL NÚCLEO
-    // ========================================================
-
-    const safePosition =
-        findSafeCorePosition(
-            player
         );
-
-
-    corePosition.copy(
-        safePosition
-    );
 
 
     // ========================================================
@@ -898,11 +655,13 @@ export function createTestCore(
     // ========================================================
 
     const group =
-        createCoreVisual();
+        createCoreVisual(
+            missionIndex
+        );
 
 
     group.position.copy(
-        corePosition
+        worldPosition
     );
 
 
@@ -912,19 +671,30 @@ export function createTestCore(
 
 
     // ========================================================
-    // FÍSICA
+    // SENSOR RAPIER
     // ========================================================
 
     const {
+
         rigidBody,
+
         collider
+
     } =
         createCorePhysics(
-            corePosition
+            worldPosition
         );
 
 
     const core = {
+
+        // Orden dentro de esta partida: 1-5.
+        id:
+            missionIndex + 1,
+
+        // Punto original elegido por el usuario: 1-8.
+        positionId:
+            positionData.id,
 
         group,
 
@@ -944,12 +714,95 @@ export function createTestCore(
 
 
     console.log(
-        '🟢 Núcleo de prueba creado en:',
-        corePosition
+        `🟢 Núcleo ${core.id}/${TOTAL_CORES} creado usando el punto #${core.positionId}:`,
+        worldPosition
     );
 
 
     return core;
+
+}
+
+
+// ============================================================
+// CREAR LOS 5 NÚCLEOS ALEATORIOS
+// ============================================================
+
+export function createMissionCores(
+    scene,
+    player
+) {
+
+    if (
+        !scene ||
+        !player
+    ) {
+
+        return [];
+
+    }
+
+
+    // Evitar duplicarlos.
+    if (
+        cores.length > 0
+    ) {
+
+        return cores;
+
+    }
+
+
+    destroyedCoreCount =
+        0;
+
+
+    updateCoreHUD();
+
+
+    // ========================================================
+    // ELEGIR 5 DE LOS 8
+    // ========================================================
+
+    selectedCorePositions =
+        chooseRandomCorePositions();
+
+
+    console.log(
+        '🎲 Puntos seleccionados para esta partida:',
+        selectedCorePositions.map(
+            (position) =>
+                position.id
+        )
+    );
+
+
+    // ========================================================
+    // CREARLOS
+    // ========================================================
+
+    selectedCorePositions.forEach(
+        (
+            positionData,
+            index
+        ) => {
+
+            createCore(
+                scene,
+                positionData,
+                index
+            );
+
+        }
+    );
+
+
+    console.log(
+        `🎯 Núcleos creados: ${cores.length}/${TOTAL_CORES}`
+    );
+
+
+    return cores;
 
 }
 
@@ -982,7 +835,7 @@ function destroyCore(
 
 
     // ========================================================
-    // ELIMINAR FÍSICA
+    // ELIMINAR SENSOR RAPIER
     // ========================================================
 
     const physicsWorld =
@@ -1058,9 +911,29 @@ function destroyCore(
     }
 
 
+    updateCoreHUD();
+
+
     console.log(
-        `💥 Núcleo destruido: ${destroyedCoreCount}/${cores.length}`
+        `💥 Núcleo ${core.id} destruido (punto #${core.positionId})`
     );
+
+
+    console.log(
+        `🎯 Progreso: ${destroyedCoreCount}/${TOTAL_CORES}`
+    );
+
+
+    if (
+        destroyedCoreCount >=
+        TOTAL_CORES
+    ) {
+
+        console.log(
+            '✅ Todos los núcleos fueron destruidos.'
+        );
+
+    }
 
 }
 
@@ -1084,7 +957,7 @@ export function updateCores(
 
 
     // ========================================================
-    // ANIMACIÓN VISUAL
+    // ANIMACIÓN
     // ========================================================
 
     for (
@@ -1101,8 +974,13 @@ export function updateCores(
         }
 
 
+        const rotationSpeed =
+            core.group.userData.rotationSpeed ??
+            0.8;
+
+
         core.group.rotation.y +=
-            0.9 *
+            rotationSpeed *
             deltaTime;
 
 
@@ -1111,7 +989,11 @@ export function updateCores(
         ) {
 
             core.group.userData.ring1.rotation.z +=
-                1.4 *
+                (
+                    1.35 +
+                    core.id *
+                    0.03
+                ) *
                 deltaTime;
 
         }
@@ -1122,7 +1004,11 @@ export function updateCores(
         ) {
 
             core.group.userData.ring2.rotation.x +=
-                1.1 *
+                (
+                    1.05 +
+                    core.id *
+                    0.025
+                ) *
                 deltaTime;
 
         }
@@ -1131,7 +1017,7 @@ export function updateCores(
 
 
     // ========================================================
-    // DETECTAR IMPACTOS DE PROYECTILES
+    // DETECTAR IMPACTOS
     // ========================================================
 
     const projectiles =
@@ -1178,8 +1064,8 @@ export function updateCores(
                 CORE_HIT_DISTANCE
             ) {
 
-                // Marcar proyectil para eliminarse
-                // en el siguiente updateProjectiles().
+                // El projectile.js lo eliminará
+                // en el siguiente update.
                 projectile.lifetime =
                     0;
 
@@ -1202,7 +1088,7 @@ export function updateCores(
 
 
 // ============================================================
-// OBTENER PROGRESO
+// GETTERS
 // ============================================================
 
 export function getDestroyedCoreCount() {
@@ -1214,6 +1100,24 @@ export function getDestroyedCoreCount() {
 
 export function getTotalCoreCount() {
 
-    return cores.length;
+    return TOTAL_CORES;
+
+}
+
+
+export function getCores() {
+
+    return cores;
+
+}
+
+
+export function getSelectedCorePositions() {
+
+    return selectedCorePositions.map(
+        (position) => ({
+            ...position
+        })
+    );
 
 }

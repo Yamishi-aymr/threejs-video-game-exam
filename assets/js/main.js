@@ -57,6 +57,7 @@ import {
 
 } from './cores.js';
 
+
 // ============================================================
 
 // ELEMENTOS HTML
@@ -90,6 +91,7 @@ const gameStateElement =
 // ============================================================
 
 const scene = new THREE.Scene();
+
 
 scene.background =
 
@@ -251,22 +253,20 @@ const controls =
         renderer.domElement
     );
 
-// OrbitControls siempre permanece disponible.
+// OrbitControls permanece disponible.
 //
-// La cámara acompaña la POSICIÓN del personaje,
-// pero ya NO persigue automáticamente cada giro.
-//
-// Esto evita movimientos bruscos al usar WASD y permite
-// inspeccionar el escenario incluso mientras caminas.
+// El usuario puede inspeccionar el escenario con el mouse.
+// Cuando deja de mover la cámara y comienza a caminar,
+// la cámara vuelve SUAVEMENTE detrás del personaje.
 controls.enableDamping = true;
-controls.dampingFactor = 0.06;
+controls.dampingFactor = 0.05;
 
 controls.enablePan = false;
 controls.enableZoom = true;
 controls.enableRotate = true;
 
-controls.minDistance = 2.2;
-controls.maxDistance = 5.0;
+controls.minDistance = 1.25;
+controls.maxDistance = 4.8;
 
 controls.minPolarAngle = 0.35;
 controls.maxPolarAngle =
@@ -276,6 +276,52 @@ controls.target.set(
     0,
     2,
     0
+);
+
+
+// ============================================================
+// INTERACCIÓN MANUAL DE CÁMARA
+// ============================================================
+//
+// Mientras el usuario está moviendo OrbitControls,
+// el seguimiento automático NO intenta recentrar.
+//
+// Cuando suelta el mouse:
+// - en Idle conservamos el ángulo elegido;
+// - al moverse, después de una pequeña pausa,
+//   la cámara empieza a volver detrás del personaje.
+// ============================================================
+
+let isCameraOrbiting =
+    false;
+
+
+let timeSinceManualCamera =
+    Infinity;
+
+
+controls.addEventListener(
+    'start',
+    () => {
+
+        isCameraOrbiting =
+            true;
+
+    }
+);
+
+
+controls.addEventListener(
+    'end',
+    () => {
+
+        isCameraOrbiting =
+            false;
+
+        timeSinceManualCamera =
+            0;
+
+    }
 );
 
 // ============================================================
@@ -1089,41 +1135,105 @@ window.addEventListener(
 );
 
 // ============================================================
-// CÁMARA EN TERCERA PERSONA - SEGUIMIENTO ESTABLE
+// CÁMARA EN TERCERA PERSONA - SEGUIMIENTO CON PESO
 // ============================================================
 //
-// NUEVO COMPORTAMIENTO:
+// Comportamiento:
 //
-// - La cámara inicia detrás del personaje.
-// - Al caminar, sigue solamente su POSICIÓN.
-// - NO gira automáticamente cada vez que el personaje gira.
-// - OrbitControls permanece activo siempre.
-// - El jugador puede inspeccionar la habitación caminando.
-// - La cámara conserva el ángulo elegido por el usuario.
+// - inicia detrás del personaje;
+// - sigue su posición;
+// - sigue su giro con retraso suave;
+// - tiene un pequeño offset de hombro;
+// - OrbitControls sigue funcionando;
+// - mientras el usuario mueve el mouse no se recentra;
+// - si está Idle, conserva el ángulo elegido;
+// - cuando vuelve a caminar, retorna poco a poco a la espalda.
 //
-// Esto reduce mucho la sensación de mareo.
+// La intención es evitar una cámara "soldada" al personaje
+// y conseguir una sensación de cámara con peso.
 // ============================================================
 
 
-// Distancia inicial detrás del personaje.
+// ============================================================
+// CONFIGURACIÓN PRINCIPAL
+// ============================================================
+
+// Distancia detrás del personaje.
 const CAMERA_DISTANCE =
+    3.8;
+
+
+// Altura de la cámara.
+const CAMERA_HEIGHT =
+    1.75;
+
+
+// Altura del punto que observa.
+const CAMERA_TARGET_HEIGHT =
+    1.30;
+
+
+// Cuánto mira por delante del personaje.
+const CAMERA_LOOK_AHEAD =
+    1.00;
+
+
+// Desplazamiento lateral tipo cámara sobre el hombro.
+//
+// Positivo = hombro derecho.
+// Negativo = hombro izquierdo.
+const CAMERA_SHOULDER_OFFSET =
+    0.50;
+
+
+// ============================================================
+// SUAVIZADO
+// ============================================================
+
+// Qué tan rápido sigue la posición.
+//
+// Este valor puede ser relativamente alto porque no produce
+// el mismo mareo que copiar instantáneamente la rotación.
+const CAMERA_POSITION_SPEED =
+    3.8;
+
+
+// Qué tan rápido sigue el GIRO del personaje.
+//
+// Este es intencionalmente más bajo para que
+// la cámara tenga "peso".
+const CAMERA_ROTATION_SPEED =
+    1.65;
+
+
+// Qué tan rápido se mueve el punto al que mira.
+const CAMERA_TARGET_SPEED =
     4.2;
 
 
-// Altura inicial de la cámara.
-const CAMERA_HEIGHT =
-    1.9;
+// Tiempo después de soltar OrbitControls antes de
+// permitir que la cámara se recentre al caminar.
+const CAMERA_RECENTER_DELAY =
+    0.30;
 
 
-// Altura aproximada del torso.
-const CAMERA_TARGET_HEIGHT =
-    1.25;
+// Distancia mínima recorrida en un frame para considerar
+// que el personaje está realmente moviéndose.
+const CAMERA_MOVEMENT_EPSILON =
+    0.0000005;
 
 
-// La mira comienza ligeramente por delante
-// del personaje.
-const CAMERA_LOOK_AHEAD =
-    1.15;
+// ============================================================
+// ESTADO DEL SEGUIMIENTO
+// ============================================================
+
+let cameraTrackingInitialized =
+    false;
+
+
+// Yaw suavizado utilizado para seguir la orientación.
+let cameraFollowYaw =
+    0;
 
 
 // ============================================================
@@ -1134,7 +1244,15 @@ const playerForward =
     new THREE.Vector3();
 
 
-const playerBackward =
+const smoothForward =
+    new THREE.Vector3();
+
+
+const smoothBackward =
+    new THREE.Vector3();
+
+
+const smoothRight =
     new THREE.Vector3();
 
 
@@ -1146,28 +1264,16 @@ const desiredCameraTarget =
     new THREE.Vector3();
 
 
-// Desplazamiento real del personaje entre frames.
-const playerFrameMovement =
-    new THREE.Vector3();
-
-
-// Última posición conocida.
 const previousPlayerPosition =
     new THREE.Vector3();
 
 
-// ¿Ya tenemos posición inicial?
-let cameraTrackingInitialized =
-    false;
+const playerFrameMovement =
+    new THREE.Vector3();
 
 
 // ============================================================
-// OBTENER DIRECCIÓN FRONTAL DEL PERSONAJE
-// ============================================================
-//
-// Solo se utiliza para colocar la cámara inicialmente.
-// Después de comenzar el juego, la cámara ya no persigue
-// automáticamente esta rotación.
+// FUNCIONES AUXILIARES
 // ============================================================
 
 function getPlayerForward(
@@ -1214,7 +1320,95 @@ function getPlayerForward(
 
 
 // ============================================================
-// COLOCAR CÁMARA INICIAL DETRÁS DEL PERSONAJE
+// CONVERTIR DIRECCIÓN A YAW
+// ============================================================
+
+function getYawFromForward(
+    forward
+) {
+
+    return Math.atan2(
+        forward.x,
+        forward.z
+    );
+
+}
+
+
+// ============================================================
+// INTERPOLAR ÁNGULO POR EL CAMINO MÁS CORTO
+// ============================================================
+
+function lerpAngle(
+    current,
+    target,
+    alpha
+) {
+
+    const difference =
+        Math.atan2(
+            Math.sin(
+                target -
+                current
+            ),
+            Math.cos(
+                target -
+                current
+            )
+        );
+
+
+    return current +
+        difference *
+        alpha;
+
+}
+
+
+// ============================================================
+// GENERAR VECTORES DESDE EL YAW SUAVIZADO
+// ============================================================
+
+function updateSmoothedDirections() {
+
+    smoothForward.set(
+        Math.sin(
+            cameraFollowYaw
+        ),
+        0,
+        Math.cos(
+            cameraFollowYaw
+        )
+    );
+
+
+    smoothForward.normalize();
+
+
+    smoothBackward
+        .copy(
+            smoothForward
+        )
+        .multiplyScalar(
+            -1
+        );
+
+
+    // Derecha respecto a la dirección frontal.
+    smoothRight.set(
+        smoothForward.z,
+        0,
+        -smoothForward.x
+    );
+
+
+    smoothRight.normalize();
+
+}
+
+
+// ============================================================
+// COLOCAR CÁMARA INICIAL
 // ============================================================
 
 function snapCameraBehindPlayer(
@@ -1236,17 +1430,17 @@ function snapCameraBehindPlayer(
         );
 
 
-    playerBackward
-        .copy(
+    cameraFollowYaw =
+        getYawFromForward(
             forward
-        )
-        .multiplyScalar(
-            -1
         );
 
 
+    updateSmoothedDirections();
+
+
     // ========================================================
-    // POSICIÓN INICIAL
+    // POSICIÓN
     // ========================================================
 
     desiredCameraPosition
@@ -1254,8 +1448,12 @@ function snapCameraBehindPlayer(
             player.position
         )
         .addScaledVector(
-            playerBackward,
+            smoothBackward,
             CAMERA_DISTANCE
+        )
+        .addScaledVector(
+            smoothRight,
+            CAMERA_SHOULDER_OFFSET
         );
 
 
@@ -1264,7 +1462,7 @@ function snapCameraBehindPlayer(
 
 
     // ========================================================
-    // OBJETIVO INICIAL
+    // TARGET
     // ========================================================
 
     desiredCameraTarget
@@ -1278,7 +1476,7 @@ function snapCameraBehindPlayer(
 
 
     desiredCameraTarget.addScaledVector(
-        forward,
+        smoothForward,
         CAMERA_LOOK_AHEAD
     );
 
@@ -1293,7 +1491,6 @@ function snapCameraBehindPlayer(
     );
 
 
-    // Guardar posición para empezar el seguimiento.
     previousPlayerPosition.copy(
         player.position
     );
@@ -1303,50 +1500,18 @@ function snapCameraBehindPlayer(
         true;
 
 
-    // OrbitControls siempre disponible.
-    controls.enableRotate =
-        true;
-
-    controls.enableZoom =
-        true;
-
-
     controls.update();
 
 }
 
 
 // ============================================================
-// ACTUALIZAR CÁMARA EN TERCERA PERSONA
-// ============================================================
-//
-// En lugar de recalcular la cámara usando la rotación
-// del personaje, trasladamos la cámara exactamente la misma
-// distancia que se movió el jugador.
-//
-// Ejemplo:
-//
-// FRAME 1:
-//
-//       👤
-//        \
-//         🎥
-//
-// El jugador avanza:
-//
-//          👤
-//           \
-//            🎥
-//
-// Tanto la cámara como su target se desplazaron juntos,
-// por lo que el ángulo de visión NO cambia.
-//
-// Si el usuario mueve el mouse, OrbitControls modifica
-// libremente ese ángulo.
+// ACTUALIZAR CÁMARA
 // ============================================================
 
 function updateThirdPersonCamera(
-    player
+    player,
+    deltaTime
 ) {
 
     if (
@@ -1358,21 +1523,24 @@ function updateThirdPersonCamera(
     }
 
 
+    const safeDeltaTime =
+        Math.max(
+            deltaTime,
+            0
+        );
+
+
     // ========================================================
-    // PRIMER FRAME
+    // INICIALIZACIÓN
     // ========================================================
 
     if (
         !cameraTrackingInitialized
     ) {
 
-        previousPlayerPosition.copy(
-            player.position
+        snapCameraBehindPlayer(
+            player
         );
-
-
-        cameraTrackingInitialized =
-            true;
 
 
         return;
@@ -1381,7 +1549,24 @@ function updateThirdPersonCamera(
 
 
     // ========================================================
-    // CUÁNTO SE MOVIÓ EL PERSONAJE
+    // TIEMPO DESDE EL ÚLTIMO MOVIMIENTO MANUAL
+    // ========================================================
+
+    if (
+        !isCameraOrbiting &&
+        Number.isFinite(
+            timeSinceManualCamera
+        )
+    ) {
+
+        timeSinceManualCamera +=
+            safeDeltaTime;
+
+    }
+
+
+    // ========================================================
+    // MOVIMIENTO DEL PERSONAJE
     // ========================================================
 
     playerFrameMovement
@@ -1393,22 +1578,113 @@ function updateThirdPersonCamera(
         );
 
 
+    const isPlayerMoving =
+        playerFrameMovement.lengthSq() >
+        CAMERA_MOVEMENT_EPSILON;
+
+
     // ========================================================
-    // MOVER CÁMARA Y TARGET JUNTOS
+    // MIENTRAS EL USUARIO MUEVE LA CÁMARA
     // ========================================================
     //
-    // Esto conserva:
+    // No recentramos.
     //
-    // - distancia,
-    // - altura,
-    // - ángulo,
-    // - orientación elegida con OrbitControls.
-    //
+    // Si además el personaje se mueve, trasladamos cámara
+    // y target junto con él para que no se quede atrás.
     // ========================================================
 
     if (
-        playerFrameMovement.lengthSq() >
-        0.00000001
+        isCameraOrbiting
+    ) {
+
+        if (
+            isPlayerMoving
+        ) {
+
+            camera.position.add(
+                playerFrameMovement
+            );
+
+
+            controls.target.add(
+                playerFrameMovement
+            );
+
+        }
+
+
+        // Seguimos actualizando internamente el yaw deseado
+        // para que cuando el usuario suelte el mouse la
+        // transición parta hacia la orientación actual.
+        const playerYaw =
+            getYawFromForward(
+                getPlayerForward(
+                    player
+                )
+            );
+
+
+        const rotationAlpha =
+            1 -
+            Math.exp(
+                -CAMERA_ROTATION_SPEED *
+                safeDeltaTime
+            );
+
+
+        cameraFollowYaw =
+            lerpAngle(
+                cameraFollowYaw,
+                playerYaw,
+                rotationAlpha
+            );
+
+
+        previousPlayerPosition.copy(
+            player.position
+        );
+
+
+        return;
+
+    }
+
+
+    // ========================================================
+    // IDLE
+    // ========================================================
+    //
+    // Si el personaje está quieto NO forzamos recentrado.
+    //
+    // Esto permite inspeccionar tranquilamente la habitación
+    // con OrbitControls.
+    // ========================================================
+
+    if (
+        !isPlayerMoving
+    ) {
+
+        previousPlayerPosition.copy(
+            player.position
+        );
+
+
+        return;
+
+    }
+
+
+    // ========================================================
+    // DESPUÉS DE USAR EL MOUSE
+    // ========================================================
+    //
+    // Durante un pequeño intervalo seguimos respetando
+    // el ángulo manual aunque el personaje esté caminando.
+    // ========================================================
+
+    if (
+        timeSinceManualCamera <
+        CAMERA_RECENTER_DELAY
     ) {
 
         camera.position.add(
@@ -1420,108 +1696,272 @@ function updateThirdPersonCamera(
             playerFrameMovement
         );
 
+
+        previousPlayerPosition.copy(
+            player.position
+        );
+
+
+        return;
+
     }
 
 
     // ========================================================
-    // GUARDAR POSICIÓN PARA EL SIGUIENTE FRAME
+    // SEGUIMIENTO CON PESO
     // ========================================================
+
+    const forward =
+        getPlayerForward(
+            player
+        );
+
+
+    const playerYaw =
+        getYawFromForward(
+            forward
+        );
+
+
+    // --------------------------------------------------------
+    // ROTACIÓN LENTA
+    // --------------------------------------------------------
+
+    const rotationAlpha =
+        1 -
+        Math.exp(
+            -CAMERA_ROTATION_SPEED *
+            safeDeltaTime
+        );
+
+
+    cameraFollowYaw =
+        lerpAngle(
+            cameraFollowYaw,
+            playerYaw,
+            rotationAlpha
+        );
+
+
+    updateSmoothedDirections();
+
+
+    // ========================================================
+    // POSICIÓN DESEADA
+    // ========================================================
+
+    desiredCameraPosition
+        .copy(
+            player.position
+        )
+        .addScaledVector(
+            smoothBackward,
+            CAMERA_DISTANCE
+        )
+        .addScaledVector(
+            smoothRight,
+            CAMERA_SHOULDER_OFFSET
+        );
+
+
+    desiredCameraPosition.y +=
+        CAMERA_HEIGHT;
+
+
+    // ========================================================
+    // TARGET DESEADO
+    // ========================================================
+
+    desiredCameraTarget
+        .copy(
+            player.position
+        );
+
+
+    desiredCameraTarget.y +=
+        CAMERA_TARGET_HEIGHT;
+
+
+    desiredCameraTarget.addScaledVector(
+        smoothForward,
+        CAMERA_LOOK_AHEAD
+    );
+
+
+    // ========================================================
+    // SUAVIZADO DE POSICIÓN
+    // ========================================================
+
+    const positionAlpha =
+        1 -
+        Math.exp(
+            -CAMERA_POSITION_SPEED *
+            safeDeltaTime
+        );
+
+
+    camera.position.lerp(
+        desiredCameraPosition,
+        positionAlpha
+    );
+
+
+    // ========================================================
+    // SUAVIZADO DEL TARGET
+    // ========================================================
+
+    const targetAlpha =
+        1 -
+        Math.exp(
+            -CAMERA_TARGET_SPEED *
+            safeDeltaTime
+        );
+
+
+    controls.target.lerp(
+        desiredCameraTarget,
+        targetAlpha
+    );
+
 
     previousPlayerPosition.copy(
         player.position
     );
 
-
-    // OrbitControls nunca se bloquea.
-    controls.enableRotate =
-        true;
-
-    controls.enableZoom =
-        true;
-
 }
 
 // ============================================================
-
-// COLISIÓN DE CÁMARA
-
+// COLISIÓN DE CÁMARA - VOLUMEN APROXIMADO
+// ============================================================
+//
+// Antes se utilizaba un único rayo desde el target hasta
+// la cámara. Eso podía dejar pasar una esquina de pared
+// muy cerca del lente.
+//
+// Ahora usamos cinco rayos:
+//
+//              ↑
+//          ←   •   →
+//              ↓
+//
+// El punto central es la trayectoria principal y los otros
+// cuatro simulan aproximadamente el volumen de la cámara.
+//
+// Resultado:
+// - menos paredes ocupando toda la pantalla;
+// - menos clipping en esquinas;
+// - la cámara conserva un margen respecto a los muros;
+// - cuando entra a un espacio estrecho se acerca al personaje;
+// - cuando vuelve a haber espacio recupera su distancia
+//   gracias al seguimiento suave principal.
 // ============================================================
 
-const CAMERA_WALL_MARGIN = 0.45;
 
+// Radio aproximado de la cámara.
+const CAMERA_COLLISION_RADIUS =
+    0.30;
+
+
+// Margen extra antes de tocar una pared.
+const CAMERA_WALL_MARGIN =
+    0.20;
+
+
+// Nunca acercar más que esto al punto objetivo.
 const CAMERA_COLLISION_MIN_DISTANCE =
+    1.20;
 
-    0.65;
 
-// Distancia máxima hacia abajo para buscar piso
-
+// Distancia hacia abajo utilizada para comprobar
+// que la cámara no termine flotando fuera del escenario.
 const CAMERA_FLOOR_CHECK_DISTANCE =
+    5.5;
 
-    4.5;
 
-const CAMERA_SEARCH_STEP = 0.20;
+// Paso para buscar una posición con piso si fuera necesario.
+const CAMERA_SEARCH_STEP =
+    0.15;
+
+
+// ============================================================
+// VECTORES REUTILIZABLES
+// ============================================================
 
 const cameraRayDirection =
-
     new THREE.Vector3();
+
+
+const cameraCollisionRight =
+    new THREE.Vector3();
+
+
+const cameraCollisionUp =
+    new THREE.Vector3();
+
+
+const cameraCollisionOffset =
+    new THREE.Vector3();
+
+
+const cameraRayOriginOffset =
+    new THREE.Vector3();
+
 
 const cameraSafePosition =
-
     new THREE.Vector3();
+
 
 const cameraCandidatePosition =
-
     new THREE.Vector3();
 
+
+const cameraWorldUp =
+    new THREE.Vector3(
+        0,
+        1,
+        0
+    );
+
+
 // ============================================================
-
-// COMPROBAR SI HAY PISO DEBAJO DE LA CÁMARA
-
+// COMPROBAR PISO
 // ============================================================
 
 function hasFloorBelow(
-
     position
-
 ) {
 
     const physicsWorld =
-
         getPhysicsWorld();
 
-    const RAPIER =
 
+    const RAPIER =
         getRapier();
 
+
     if (
-
         !physicsWorld ||
-
         !RAPIER
-
     ) {
 
         return true;
 
     }
 
-    // --------------------------------------------------------
-
-    // RAYO VERTICAL HACIA ABAJO
-
-    // --------------------------------------------------------
 
     const ray =
-
         new RAPIER.Ray(
 
             {
 
-                x: position.x,
+                x:
+                    position.x,
 
-                y: position.y + 0.1,
+                y:
+                    position.y + 0.10,
 
-                z: position.z
+                z:
+                    position.z
 
             },
 
@@ -1537,8 +1977,8 @@ function hasFloorBelow(
 
         );
 
-    const hit =
 
+    const hit =
         physicsWorld.castRay(
 
             ray,
@@ -1551,147 +1991,88 @@ function hasFloorBelow(
 
         );
 
+
     return Boolean(
-
         hit
-
     );
 
 }
 
-// ============================================================
-
-// EVITAR QUE LA CÁMARA ATRAVIESE PAREDES
 
 // ============================================================
-
+// LANZAR UN RAYO DE COLISIÓN
 // ============================================================
 
-// EVITAR QUE LA CÁMARA SALGA DEL ESCENARIO
-
-// ============================================================
-
-function resolveCameraCollision(
-
-    player
-
+function getCameraRaySafeDistance(
+    rayOrigin,
+    direction,
+    desiredDistance,
+    offset
 ) {
 
-    if (
-
-        !player
-
-    ) {
-
-        return;
-
-    }
-
     const physicsWorld =
-
         getPhysicsWorld();
 
-    const RAPIER =
 
+    const RAPIER =
         getRapier();
 
+
     if (
-
         !physicsWorld ||
-
         !RAPIER
-
     ) {
 
-        return;
+        return desiredDistance;
 
     }
 
-    // ========================================================
 
-    // PUNTO CENTRAL DEL PERSONAJE
-
-    // ========================================================
-
-    const rayOrigin =
-
-        controls.target;
-
-    // ========================================================
-
-    // DIRECCIÓN DESDE EL PERSONAJE HACIA LA CÁMARA
-
-    // ========================================================
-
-    cameraRayDirection
-
+    cameraRayOriginOffset
         .copy(
-
-            camera.position
-
-        )
-
-        .sub(
-
             rayOrigin
-
+        )
+        .add(
+            offset
         );
 
-    const desiredDistance =
 
-        cameraRayDirection.length();
-
-    if (
-
-        desiredDistance <= 0.001
-
-    ) {
-
-        return;
-
-    }
-
-    cameraRayDirection.normalize();
-
-    // ========================================================
-
-    // PRIMERA DEFENSA:
-
-    // COMPROBAR PAREDES
-
-    // ========================================================
-
-    const wallRay =
-
+    const ray =
         new RAPIER.Ray(
 
             {
 
-                x: rayOrigin.x,
+                x:
+                    cameraRayOriginOffset.x,
 
-                y: rayOrigin.y,
+                y:
+                    cameraRayOriginOffset.y,
 
-                z: rayOrigin.z
+                z:
+                    cameraRayOriginOffset.z
 
             },
 
             {
 
-                x: cameraRayDirection.x,
+                x:
+                    direction.x,
 
-                y: cameraRayDirection.y,
+                y:
+                    direction.y,
 
-                z: cameraRayDirection.z
+                z:
+                    direction.z
 
             }
 
         );
 
-    const wallHit =
 
+    const hit =
         physicsWorld.castRay(
 
-            wallRay,
+            ray,
 
             desiredDistance,
 
@@ -1701,137 +2082,340 @@ function resolveCameraCollision(
 
         );
 
-    // ========================================================
-
-    // DISTANCIA PERMITIDA
-
-    // ========================================================
-
-    let safeDistance =
-
-        desiredDistance;
-
-    // ========================================================
-
-    // SI HAY PARED, ACERCAR LA CÁMARA
-
-    // ========================================================
 
     if (
-
-        wallHit
-
+        !hit
     ) {
 
-        safeDistance =
-
-            Math.max(
-
-                CAMERA_COLLISION_MIN_DISTANCE,
-
-                wallHit.timeOfImpact -
-
-                CAMERA_WALL_MARGIN
-
-            );
+        return desiredDistance;
 
     }
 
+
+    return Math.max(
+
+        CAMERA_COLLISION_MIN_DISTANCE,
+
+        hit.timeOfImpact -
+        CAMERA_WALL_MARGIN
+
+    );
+
+}
+
+
+// ============================================================
+// RESOLVER COLISIÓN
+// ============================================================
+
+function resolveCameraCollision(
+    player
+) {
+
+    if (
+        !player
+    ) {
+
+        return;
+
+    }
+
+
+    const physicsWorld =
+        getPhysicsWorld();
+
+
+    const RAPIER =
+        getRapier();
+
+
+    if (
+        !physicsWorld ||
+        !RAPIER
+    ) {
+
+        return;
+
+    }
+
+
+    // ========================================================
+    // ORIGEN
+    // ========================================================
+    //
+    // Usamos el target actual de OrbitControls porque
+    // representa el punto que la cámara está observando.
     // ========================================================
 
-    // POSICIÓN INICIAL PROPUESTA
+    const rayOrigin =
+        controls.target;
+
 
     // ========================================================
+    // DIRECCIÓN HACIA LA CÁMARA
+    // ========================================================
 
-    cameraSafePosition
-
+    cameraRayDirection
         .copy(
-
-            rayOrigin
-
+            camera.position
         )
+        .sub(
+            rayOrigin
+        );
 
-        .addScaledVector(
 
+    const desiredDistance =
+        cameraRayDirection.length();
+
+
+    if (
+        desiredDistance <=
+        0.001
+    ) {
+
+        return;
+
+    }
+
+
+    cameraRayDirection.normalize();
+
+
+    // ========================================================
+    // EJES DEL "VOLUMEN" DE CÁMARA
+    // ========================================================
+
+    cameraCollisionRight
+        .crossVectors(
+            cameraWorldUp,
+            cameraRayDirection
+        );
+
+
+    // Si la cámara está casi totalmente vertical,
+    // usamos un eje alternativo.
+    if (
+        cameraCollisionRight.lengthSq() <
+        0.000001
+    ) {
+
+        cameraCollisionRight.set(
+            1,
+            0,
+            0
+        );
+
+    } else {
+
+        cameraCollisionRight.normalize();
+
+    }
+
+
+    cameraCollisionUp
+        .crossVectors(
             cameraRayDirection,
+            cameraCollisionRight
+        )
+        .normalize();
 
-            safeDistance
+
+    // ========================================================
+    // CINCO RAYOS
+    // ========================================================
+
+    let safeDistance =
+        desiredDistance;
+
+
+    // Centro.
+    cameraCollisionOffset.set(
+        0,
+        0,
+        0
+    );
+
+
+    safeDistance =
+        Math.min(
+
+            safeDistance,
+
+            getCameraRaySafeDistance(
+                rayOrigin,
+                cameraRayDirection,
+                desiredDistance,
+                cameraCollisionOffset
+            )
 
         );
 
+
+    // Derecha.
+    cameraCollisionOffset
+        .copy(
+            cameraCollisionRight
+        )
+        .multiplyScalar(
+            CAMERA_COLLISION_RADIUS
+        );
+
+
+    safeDistance =
+        Math.min(
+
+            safeDistance,
+
+            getCameraRaySafeDistance(
+                rayOrigin,
+                cameraRayDirection,
+                desiredDistance,
+                cameraCollisionOffset
+            )
+
+        );
+
+
+    // Izquierda.
+    cameraCollisionOffset
+        .copy(
+            cameraCollisionRight
+        )
+        .multiplyScalar(
+            -CAMERA_COLLISION_RADIUS
+        );
+
+
+    safeDistance =
+        Math.min(
+
+            safeDistance,
+
+            getCameraRaySafeDistance(
+                rayOrigin,
+                cameraRayDirection,
+                desiredDistance,
+                cameraCollisionOffset
+            )
+
+        );
+
+
+    // Arriba.
+    cameraCollisionOffset
+        .copy(
+            cameraCollisionUp
+        )
+        .multiplyScalar(
+            CAMERA_COLLISION_RADIUS
+        );
+
+
+    safeDistance =
+        Math.min(
+
+            safeDistance,
+
+            getCameraRaySafeDistance(
+                rayOrigin,
+                cameraRayDirection,
+                desiredDistance,
+                cameraCollisionOffset
+            )
+
+        );
+
+
+    // Abajo.
+    cameraCollisionOffset
+        .copy(
+            cameraCollisionUp
+        )
+        .multiplyScalar(
+            -CAMERA_COLLISION_RADIUS
+        );
+
+
+    safeDistance =
+        Math.min(
+
+            safeDistance,
+
+            getCameraRaySafeDistance(
+                rayOrigin,
+                cameraRayDirection,
+                desiredDistance,
+                cameraCollisionOffset
+            )
+
+        );
+
+
+    // ========================================================
+    // POSICIÓN SEGURA
     // ========================================================
 
-    // SEGUNDA DEFENSA:
+    cameraSafePosition
+        .copy(
+            rayOrigin
+        )
+        .addScaledVector(
+            cameraRayDirection,
+            safeDistance
+        );
 
-    // COMPROBAR QUE EXISTA PISO
 
+    // ========================================================
+    // EVITAR SALIR DEL MAPA
     // ========================================================
 
     if (
-
         !hasFloorBelow(
-
             cameraSafePosition
-
         )
-
     ) {
 
         let validPositionFound =
-
             false;
 
-        // ----------------------------------------------------
-
-        // ACERCARNOS AL PERSONAJE POCO A POCO
-
-        // ----------------------------------------------------
 
         for (
 
-            let distance = safeDistance;
+            let distance =
+                safeDistance;
 
-            distance >= CAMERA_COLLISION_MIN_DISTANCE;
+            distance >=
+                CAMERA_COLLISION_MIN_DISTANCE;
 
-            distance -= CAMERA_SEARCH_STEP
+            distance -=
+                CAMERA_SEARCH_STEP
 
         ) {
 
             cameraCandidatePosition
-
                 .copy(
-
                     rayOrigin
-
                 )
-
                 .addScaledVector(
-
                     cameraRayDirection,
-
                     distance
-
                 );
 
+
             if (
-
                 hasFloorBelow(
-
                     cameraCandidatePosition
-
                 )
-
             ) {
 
                 cameraSafePosition.copy(
-
                     cameraCandidatePosition
-
                 );
 
-                validPositionFound =
 
+                validPositionFound =
                     true;
+
 
                 break;
 
@@ -1839,49 +2423,54 @@ function resolveCameraCollision(
 
         }
 
-        // ----------------------------------------------------
-
-        // SI NO ENCONTRAMOS NINGÚN PUNTO VÁLIDO
-
-        // ----------------------------------------------------
 
         if (
-
             !validPositionFound
-
         ) {
 
             cameraSafePosition
-
                 .copy(
-
                     rayOrigin
-
                 )
-
                 .addScaledVector(
-
                     cameraRayDirection,
-
                     CAMERA_COLLISION_MIN_DISTANCE
-
                 );
 
         }
 
     }
 
-    // ========================================================
-
-    // COLOCAR CÁMARA
 
     // ========================================================
+    // APLICAR SOLO CUANDO ES NECESARIO
+    // ========================================================
+    //
+    // Si no hubo obstáculo, dejamos que el seguimiento
+    // principal controle el movimiento suave.
+    //
+    // Si hay obstáculo, corregimos inmediatamente para que
+    // la pared nunca atraviese la cámara.
+    // ========================================================
 
-    camera.position.copy(
-
+    const correctedDistance =
         cameraSafePosition
+            .distanceTo(
+                rayOrigin
+            );
 
-    );
+
+    if (
+        correctedDistance <
+        desiredDistance -
+        0.001
+    ) {
+
+        camera.position.copy(
+            cameraSafePosition
+        );
+
+    }
 
 }
 
@@ -1966,7 +2555,8 @@ function animate() {
     // --------------------------------------------------------
 
     updateThirdPersonCamera(
-        activePlayer
+        activePlayer,
+        deltaTime
     );
 
     // --------------------------------------------------------
