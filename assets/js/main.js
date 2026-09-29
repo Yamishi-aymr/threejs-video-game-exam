@@ -79,6 +79,15 @@ import {
 } from './stairs.js';
 
 
+import {
+
+    createDynamicProps,
+
+    updateDynamicProps
+
+} from './props.js';
+
+
 // ============================================================
 
 // ELEMENTOS HTML
@@ -687,7 +696,7 @@ let introOverlayElement =
 //
 // Coloca tu archivo aquí:
 //
-// assets/sounds/background-music.mp3
+// assets/sounds/background-music.m4a
 //
 // La música comienza ÚNICAMENTE cuando el jugador pulsa
 // COMENZAR MISIÓN. Esto evita el bloqueo de autoplay
@@ -723,7 +732,7 @@ let backgroundMusicStarted =
 //
 // Coloca tu audio de 12 segundos aquí:
 //
-// assets/sounds/reactor-explosion.mp3
+// assets/sounds/reactor-explosion.m4a
 //
 // Como la explosión del audio ocurre aproximadamente
 // a los 6 segundos, empezamos a reproducirlo cuando
@@ -2087,6 +2096,16 @@ function loadEnvironment() {
                         // -------------------------------------
 
                         createMissionCores(
+                            scene,
+                            player
+                        );
+
+
+                        // -------------------------------------
+                        // OBJETOS FÍSICOS + ESTRUCTURA DERRIBABLE
+                        // -------------------------------------
+
+                        createDynamicProps(
                             scene,
                             player
                         );
@@ -3861,6 +3880,13 @@ function animate() {
     // --------------------------------------------------------
 
     stepPhysics();
+
+
+    // --------------------------------------------------------
+    // OBJETOS FÍSICOS DINÁMICOS
+    // --------------------------------------------------------
+
+    updateDynamicProps();
 
     // --------------------------------------------------------
     // PERSONAJE / GAMEPLAY
