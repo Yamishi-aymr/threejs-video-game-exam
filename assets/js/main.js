@@ -541,6 +541,127 @@ let defeatOverlayElement =
 
 
 // ============================================================
+// ANIMACIÓN FINAL DE EXPLOSIÓN
+// ============================================================
+
+let explosionOverlayElement =
+    null;
+
+let defeatSequenceStarted =
+    false;
+
+
+function showExplosionSequence() {
+
+    if (
+        explosionOverlayElement
+    ) {
+
+        return;
+    }
+
+
+    explosionOverlayElement =
+        document.createElement(
+            'div'
+        );
+
+    explosionOverlayElement.id =
+        'explosion-overlay';
+
+    explosionOverlayElement.className =
+        'explosion-overlay';
+
+
+    const flash =
+        document.createElement(
+            'div'
+        );
+
+    flash.className =
+        'explosion-flash';
+
+
+    const shockwave =
+        document.createElement(
+            'div'
+        );
+
+    shockwave.className =
+        'explosion-shockwave';
+
+
+    const core =
+        document.createElement(
+            'div'
+        );
+
+    core.className =
+        'explosion-core';
+
+
+    explosionOverlayElement.append(
+        flash,
+        shockwave,
+        core
+    );
+
+
+    for (
+        let i = 0;
+        i < 18;
+        i += 1
+    ) {
+
+        const particle =
+            document.createElement(
+                'span'
+            );
+
+        particle.className =
+            'explosion-particle';
+
+        particle.style.setProperty(
+            '--particle-angle',
+            `${i * 20}deg`
+        );
+
+        particle.style.setProperty(
+            '--particle-delay',
+            `${(i % 6) * 0.05}s`
+        );
+
+        particle.style.setProperty(
+            '--particle-distance',
+            `${220 + (i % 4) * 35}px`
+        );
+
+        explosionOverlayElement.appendChild(
+            particle
+        );
+
+    }
+
+
+    document.body.appendChild(
+        explosionOverlayElement
+    );
+
+
+    requestAnimationFrame(
+        () => {
+
+            explosionOverlayElement.classList.add(
+                'is-active'
+            );
+
+        }
+    );
+
+} 
+
+
+// ============================================================
 // ESTADO DE INICIO DE LA PARTIDA
 // ============================================================
 
@@ -563,10 +684,19 @@ let introOverlayElement =
 // ============================================================
 // MÚSICA DE FONDO
 // ============================================================
+//
+// Coloca tu archivo aquí:
+//
+// assets/sounds/background-music.mp3
+//
+// La música comienza ÚNICAMENTE cuando el jugador pulsa
+// COMENZAR MISIÓN. Esto evita el bloqueo de autoplay
+// de los navegadores.
+// ============================================================
 
 const backgroundMusic =
     new Audio(
-        './assets/sounds/videoplayback.m4a'
+        './assets/sounds/background-music.m4a'
     );
 
 
@@ -587,6 +717,112 @@ let backgroundMusicStarted =
     false;
 
 
+// ============================================================
+// SONIDO FINAL DEL REACTOR
+// ============================================================
+//
+// Coloca tu audio de 12 segundos aquí:
+//
+// assets/sounds/reactor-explosion.mp3
+//
+// Como la explosión del audio ocurre aproximadamente
+// a los 6 segundos, empezamos a reproducirlo cuando
+// quedan 6 segundos de partida.
+//
+// Así:
+//
+// TIEMPO 0:06 -> comienza el audio
+// 6 segundos después -> TIEMPO 0:00
+//                    -> explosión del audio
+//                    -> animación visual
+// ============================================================
+
+const reactorExplosionSound =
+    new Audio(
+        './assets/sounds/reactor-explosion.m4a'
+    );
+
+
+reactorExplosionSound.volume =
+    0.85;
+
+
+reactorExplosionSound.preload =
+    'auto';
+
+
+const EXPLOSION_SOUND_LEAD_TIME =
+    6;
+
+
+let reactorExplosionSoundStarted =
+    false;
+
+
+function startReactorExplosionSound() {
+
+    if (
+        reactorExplosionSoundStarted
+    ) {
+
+        return;
+
+    }
+
+
+    reactorExplosionSoundStarted =
+        true;
+
+
+    reactorExplosionSound.currentTime =
+        0;
+
+
+    // Bajamos la música de fondo para que el sonido
+    // final tenga más presencia.
+    backgroundMusic.volume =
+        0.08;
+
+
+    reactorExplosionSound.play()
+        .catch(
+            (error) => {
+
+                reactorExplosionSoundStarted =
+                    false;
+
+
+                console.warn(
+                    '⚠️ No se pudo iniciar el sonido final:',
+                    error
+                );
+
+            }
+        );
+
+}
+
+
+function stopReactorExplosionSound() {
+
+    if (
+        !reactorExplosionSoundStarted
+    ) {
+
+        return;
+
+    }
+
+
+    reactorExplosionSound.pause();
+
+
+    reactorExplosionSoundStarted =
+        false;
+
+}
+
+
 function startBackgroundMusic() {
 
     if (
@@ -600,6 +836,10 @@ function startBackgroundMusic() {
 
     backgroundMusicStarted =
         true;
+
+
+    backgroundMusic.volume =
+        0.25;
 
 
     backgroundMusic.currentTime =
@@ -1239,13 +1479,16 @@ function startMissionTimer() {
 function showDefeatScreen() {
 
     if (
-        defeatOverlayElement
+        defeatSequenceStarted
     ) {
 
         return;
 
     }
 
+
+    defeatSequenceStarted =
+        true;
 
     gameOver =
         true;
@@ -1266,136 +1509,165 @@ function showDefeatScreen() {
     ) {
 
         gameStateElement.textContent =
-            'DERROTA';
+            'FALLO CRÍTICO';
 
     }
 
 
-    defeatOverlayElement =
-        document.createElement(
-            'div'
-        );
+    showExplosionSequence();
 
 
-    defeatOverlayElement.id =
-        'defeat-overlay';
-
-
-    defeatOverlayElement.className =
-        'game-result-overlay game-result-overlay--defeat';
-
-
-    const panel =
-        document.createElement(
-            'div'
-        );
-
-
-    panel.className =
-        'game-result-panel game-result-panel--defeat';
-
-
-    const smallTitle =
-        document.createElement(
-            'div'
-        );
-
-
-    smallTitle.className =
-        'game-result-eyebrow game-result-eyebrow--defeat';
-
-
-    smallTitle.textContent =
-        'OPERACIÓN: REACTOR';
-
-
-    const title =
-        document.createElement(
-            'h2'
-        );
-
-
-    title.className =
-        'game-result-title';
-
-
-    title.textContent =
-        'TIEMPO AGOTADO';
-
-
-    const message =
-        document.createElement(
-            'p'
-        );
-
-
-    message.className =
-        'game-result-message';
-
-
-    message.textContent =
-        'No lograste desactivar los cinco núcleos antes de que el reactor llegara a su límite.';
-
-
-    const restartButton =
-        document.createElement(
-            'button'
-        );
-
-
-    restartButton.type =
-        'button';
-
-
-    restartButton.className =
-        'game-result-button game-result-button--defeat';
-
-
-    restartButton.textContent =
-        'REINTENTAR';
-
-
-    restartButton.addEventListener(
-        'click',
+    window.setTimeout(
         () => {
 
-            window.location.reload();
+            if (
+                gameStateElement
+            ) {
 
-        }
-    );
+                gameStateElement.textContent =
+                    'DERROTA';
 
-
-    panel.append(
-        smallTitle,
-        title,
-        message,
-        restartButton
-    );
+            }
 
 
-    defeatOverlayElement.appendChild(
-        panel
-    );
+            if (
+                defeatOverlayElement
+            ) {
+
+                return;
+
+            }
 
 
-    document.body.appendChild(
-        defeatOverlayElement
-    );
+            defeatOverlayElement =
+                document.createElement(
+                    'div'
+                );
 
 
-    requestAnimationFrame(
-        () => {
+            defeatOverlayElement.id =
+                'defeat-overlay';
 
-            defeatOverlayElement.classList.add(
-                'is-visible'
+
+            defeatOverlayElement.className =
+                'game-result-overlay game-result-overlay--defeat';
+
+
+            const panel =
+                document.createElement(
+                    'div'
+                );
+
+
+            panel.className =
+                'game-result-panel game-result-panel--defeat';
+
+
+            const smallTitle =
+                document.createElement(
+                    'div'
+                );
+
+
+            smallTitle.className =
+                'game-result-eyebrow game-result-eyebrow--defeat';
+
+
+            smallTitle.textContent =
+                'OPERACIÓN: REACTOR';
+
+
+            const title =
+                document.createElement(
+                    'h2'
+                );
+
+
+            title.className =
+                'game-result-title';
+
+
+            title.textContent =
+                'TIEMPO AGOTADO';
+
+
+            const message =
+                document.createElement(
+                    'p'
+                );
+
+
+            message.className =
+                'game-result-message';
+
+
+            message.textContent =
+                'El reactor alcanzó un fallo crítico y la instalación explotó antes de que pudieras destruir los cinco núcleos.';
+
+
+            const restartButton =
+                document.createElement(
+                    'button'
+                );
+
+
+            restartButton.type =
+                'button';
+
+
+            restartButton.className =
+                'game-result-button game-result-button--defeat';
+
+
+            restartButton.textContent =
+                'REINTENTAR';
+
+
+            restartButton.addEventListener(
+                'click',
+                () => {
+
+                    window.location.reload();
+
+                }
             );
 
-        }
-    );
+
+            panel.append(
+                smallTitle,
+                title,
+                message,
+                restartButton
+            );
 
 
-    console.log(
-        '❌ Tiempo agotado. Misión fallida.'
+            defeatOverlayElement.appendChild(
+                panel
+            );
+
+
+            document.body.appendChild(
+                defeatOverlayElement
+            );
+
+
+            requestAnimationFrame(
+                () => {
+
+                    defeatOverlayElement.classList.add(
+                        'is-visible'
+                    );
+
+                }
+            );
+
+
+            console.log(
+                '❌ Tiempo agotado. El reactor explotó.'
+            );
+
+        },
+        1850
     );
 
 }
@@ -1423,6 +1695,28 @@ function updateMissionTimer(
 
     missionTimeRemaining -=
         deltaTime;
+
+
+    // --------------------------------------------------------
+    // SINCRONIZAR SONIDO FINAL
+    // --------------------------------------------------------
+    //
+    // El audio comienza cuando quedan 6 segundos.
+    // Su explosión interna ocurre unos 6 segundos después,
+    // justo cuando el temporizador llega a 0:00.
+    // --------------------------------------------------------
+
+    if (
+        missionTimeRemaining <=
+            EXPLOSION_SOUND_LEAD_TIME &&
+        missionTimeRemaining >
+            0 &&
+        !reactorExplosionSoundStarted
+    ) {
+
+        startReactorExplosionSound();
+
+    }
 
 
     if (
@@ -3554,6 +3848,9 @@ function animate() {
     ) {
 
         stopBackgroundMusic();
+
+
+        stopReactorExplosionSound();
 
     }
 
