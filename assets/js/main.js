@@ -10,6 +10,8 @@ import {
 
     updatePlayer,
 
+    getPlayer,
+
     setThrowStartCallback,
 
     setThrowReleaseCallback
@@ -34,7 +36,13 @@ import {
 
 import {
 
-    prepareDoorsForExploration
+    prepareDoorsForExploration,
+
+    restoreDoorsAfterCollider,
+
+    setupDoorInteractions,
+
+    updateDoorInteractions
 
 } from './doors.js';
 
@@ -56,6 +64,17 @@ import {
     updateCores
 
 } from './cores.js';
+
+
+import {
+
+    setupStairs,
+
+    updateStairs,
+
+    isStairTransitionActive
+
+} from './stairs.js';
 
 
 // ============================================================
@@ -672,6 +691,28 @@ function loadEnvironment() {
 
             );
 
+
+            // =================================================
+            // VOLVER A MOSTRAR PUERTAS
+            // =================================================
+            //
+            // prepareDoorsForExploration() las retira
+            // temporalmente antes de crear el collider.
+            //
+            // Así las puertas se ven en el juego, pero NO
+            // forman parte del collider estático del escenario.
+            //
+            // Cuando el jugador pulse E, la puerta se elimina
+            // visualmente y el paso queda libre.
+            // =================================================
+
+            restoreDoorsAfterCollider();
+
+
+            environment.updateMatrixWorld(
+                true
+            );
+
             // =================================================
 
             // RECALCULAR LÍMITES DEL ESCENARIO
@@ -752,6 +793,46 @@ function loadEnvironment() {
 
                             player.position
 
+                        );
+
+
+                        // -------------------------------------
+                        // ESCALERAS INTERACTIVAS
+                        // -------------------------------------
+
+                        setupStairs({
+
+                            player,
+
+                            camera,
+
+                            controls,
+
+                            onTransitionComplete:
+                                () => {
+
+                                    snapCameraBehindPlayer(
+                                        player
+                                    );
+
+                                }
+
+                        });
+
+
+                        // -------------------------------------
+                        // PUERTAS INTERACTIVAS
+                        // -------------------------------------
+                        //
+                        // Al acercarse aparece:
+                        // [E] Abrir puerta
+                        //
+                        // Al presionar E la puerta desaparece
+                        // y NO vuelve a colocarse.
+                        // -------------------------------------
+
+                        setupDoorInteractions(
+                            player
                         );
 
 
@@ -2514,15 +2595,48 @@ function animate() {
 
     // --------------------------------------------------------
 
-    const activePlayer =
+    let activePlayer;
 
-        updatePlayer(
 
-            deltaTime,
+    if (
+        isStairTransitionActive()
+    ) {
 
-            camera
+        // Durante la transición de escaleras
+        // bloqueamos WASD temporalmente.
+        activePlayer =
+            getPlayer();
 
-        );
+    } else {
+
+        activePlayer =
+            updatePlayer(
+
+                deltaTime,
+
+                camera
+
+            );
+
+    }
+
+
+    // --------------------------------------------------------
+    // ESCALERAS / INTERACCIÓN
+    // --------------------------------------------------------
+
+    updateStairs(
+        activePlayer
+    );
+
+
+    // --------------------------------------------------------
+    // PUERTAS / INTERACCIÓN
+    // --------------------------------------------------------
+
+    updateDoorInteractions(
+        activePlayer
+    );
 
     // --------------------------------------------------------
 
