@@ -169,6 +169,343 @@ camera.position.set(
 
 );
 
+
+// ============================================================
+// POTENCIA CONFIGURABLE DEL LANZAMIENTO
+// ============================================================
+//
+// 100% conserva exactamente la potencia normal.
+// El jugador puede elegir entre 50% y 200%.
+//
+// Este valor modifica la velocidad REAL del rigid body
+// del proyectil después de ser creado por projectiles.js.
+// ============================================================
+
+const PROJECTILE_POWER_MIN =
+    50;
+
+
+const PROJECTILE_POWER_MAX =
+    200;
+
+
+const PROJECTILE_POWER_DEFAULT =
+    100;
+
+
+let projectilePowerPercent =
+    PROJECTILE_POWER_DEFAULT;
+
+
+function applyProjectilePower(
+    projectile
+) {
+
+    if (
+        !projectile
+    ) {
+
+        return;
+
+    }
+
+
+    // Compatibilidad con el nombre usado actualmente
+    // y con versiones anteriores del módulo.
+    const rigidBody =
+        projectile.rigidBody ??
+        projectile.body;
+
+
+    if (
+        !rigidBody ||
+        typeof rigidBody.linvel !==
+            'function' ||
+        typeof rigidBody.setLinvel !==
+            'function'
+    ) {
+
+        console.warn(
+            '⚠️ No se encontró el rigid body del proyectil para aplicar potencia.'
+        );
+
+
+        return;
+
+    }
+
+
+    const currentVelocity =
+        rigidBody.linvel();
+
+
+    const powerMultiplier =
+        projectilePowerPercent /
+        100;
+
+
+    rigidBody.setLinvel(
+        {
+
+            x:
+                currentVelocity.x *
+                powerMultiplier,
+
+            y:
+                currentVelocity.y *
+                powerMultiplier,
+
+            z:
+                currentVelocity.z *
+                powerMultiplier
+
+        },
+
+        true
+    );
+
+
+    console.log(
+        `💥 Potencia del lanzamiento: ${projectilePowerPercent}%`
+    );
+
+}
+
+
+function setupProjectilePowerControl() {
+
+    if (
+        document.getElementById(
+            'projectile-power'
+        )
+    ) {
+
+        return;
+
+    }
+
+
+    const hud =
+        document.querySelector(
+            '.hud'
+        );
+
+
+    if (
+        !hud
+    ) {
+
+        console.warn(
+            '⚠️ No se encontró .hud para agregar el control de potencia.'
+        );
+
+
+        return;
+
+    }
+
+
+    const divider =
+        document.createElement(
+            'div'
+        );
+
+
+    divider.className =
+        'hud-divider hud-power-divider';
+
+
+    const item =
+        document.createElement(
+            'div'
+        );
+
+
+    item.className =
+        'hud-item hud-power-item';
+
+
+    const label =
+        document.createElement(
+            'span'
+        );
+
+
+    label.className =
+        'hud-label';
+
+
+    label.textContent =
+        'POTENCIA';
+
+
+    const controlRow =
+        document.createElement(
+            'div'
+        );
+
+
+    controlRow.className =
+        'hud-power-control';
+
+
+    const input =
+        document.createElement(
+            'input'
+        );
+
+
+    input.id =
+        'projectile-power';
+
+
+    input.className =
+        'hud-power-slider';
+
+
+    input.type =
+        'range';
+
+
+    input.min =
+        String(
+            PROJECTILE_POWER_MIN
+        );
+
+
+    input.max =
+        String(
+            PROJECTILE_POWER_MAX
+        );
+
+
+    input.step =
+        '10';
+
+
+    input.value =
+        String(
+            PROJECTILE_POWER_DEFAULT
+        );
+
+
+    input.setAttribute(
+        'aria-label',
+        'Potencia del lanzamiento'
+    );
+
+
+    const value =
+        document.createElement(
+            'span'
+        );
+
+
+    value.className =
+        'hud-value hud-power-value';
+
+
+    function updatePowerValue() {
+
+        const parsedValue =
+            Number(
+                input.value
+            );
+
+
+        projectilePowerPercent =
+            THREE.MathUtils.clamp(
+                Number.isFinite(
+                    parsedValue
+                )
+                    ? parsedValue
+                    : PROJECTILE_POWER_DEFAULT,
+
+                PROJECTILE_POWER_MIN,
+
+                PROJECTILE_POWER_MAX
+            );
+
+
+        value.textContent =
+            `${projectilePowerPercent}%`;
+
+
+        const progress =
+            (
+                projectilePowerPercent -
+                PROJECTILE_POWER_MIN
+            ) /
+            (
+                PROJECTILE_POWER_MAX -
+                PROJECTILE_POWER_MIN
+            ) *
+            100;
+
+
+        input.style.setProperty(
+            '--power-progress',
+            `${progress}%`
+        );
+
+    }
+
+
+    input.addEventListener(
+        'input',
+        updatePowerValue
+    );
+
+
+    // Evitar que el arrastre del slider interfiera
+    // con cualquier interacción de cámara.
+    [
+        'pointerdown',
+        'mousedown',
+        'click'
+    ].forEach(
+        (eventName) => {
+
+            input.addEventListener(
+                eventName,
+                (event) => {
+
+                    event.stopPropagation();
+
+                }
+            );
+
+        }
+    );
+
+
+    controlRow.append(
+        input,
+        value
+    );
+
+
+    item.append(
+        label,
+        controlRow
+    );
+
+
+    hud.append(
+        divider,
+        item
+    );
+
+
+    updatePowerValue();
+
+}
+
+
+// Crear el control desde el inicio.
+setupProjectilePowerControl();
+
+
 // ============================================================
 
 // THROW - PELOTA EN LA MANO
@@ -201,12 +538,18 @@ setThrowReleaseCallback(
 
     () => {
 
-        releaseHeldProjectile(
+        const projectile =
+            releaseHeldProjectile(
 
-            scene,
+                scene,
 
-            camera
+                camera
 
+            );
+
+
+        applyProjectilePower(
+            projectile
         );
 
     }

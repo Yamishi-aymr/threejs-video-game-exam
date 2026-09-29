@@ -804,6 +804,155 @@ body {
 
 
 
+
+
+/* ===
+   POTENCIA DEL LANZAMIENTO
+=== */
+
+.hud-power-item {
+    min-width: 150px;
+
+    pointer-events: auto;
+}
+
+.hud-power-control {
+    display: flex;
+    align-items: center;
+
+    gap: 8px;
+}
+
+.hud-power-slider {
+    width: 96px;
+    height: 18px;
+
+    margin: 0;
+
+    cursor: pointer;
+
+    appearance: none;
+    -webkit-appearance: none;
+
+    background: transparent;
+
+    accent-color: #40ff9d;
+}
+
+.hud-power-slider::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 4px;
+
+    border-radius: 999px;
+
+    background:
+        linear-gradient(
+            to right,
+            rgba(64, 255, 157, 0.92)
+                0%,
+            rgba(64, 255, 157, 0.92)
+                var(--power-progress, 50%),
+            rgba(255, 255, 255, 0.16)
+                var(--power-progress, 50%),
+            rgba(255, 255, 255, 0.16)
+                100%
+        );
+}
+
+.hud-power-slider::-webkit-slider-thumb {
+    width: 13px;
+    height: 13px;
+
+    margin-top: -4.5px;
+
+    border: 2px solid rgba(8, 12, 14, 0.95);
+
+    border-radius: 50%;
+
+    appearance: none;
+    -webkit-appearance: none;
+
+    background: #40ff9d;
+
+    box-shadow:
+        0 0 0 2px rgba(64, 255, 157, 0.18);
+}
+
+.hud-power-slider::-moz-range-track {
+    height: 4px;
+
+    border-radius: 999px;
+
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.hud-power-slider::-moz-range-progress {
+    height: 4px;
+
+    border-radius: 999px;
+
+    background: rgba(64, 255, 157, 0.92);
+}
+
+.hud-power-slider::-moz-range-thumb {
+    width: 13px;
+    height: 13px;
+
+    border: 2px solid rgba(8, 12, 14, 0.95);
+
+    border-radius: 50%;
+
+    background: #40ff9d;
+}
+
+.hud-power-slider:focus-visible {
+    outline: 2px solid rgba(64, 255, 157, 0.85);
+    outline-offset: 4px;
+
+    border-radius: 999px;
+}
+
+.hud-power-value {
+    min-width: 39px;
+
+    font-size: 0.72rem;
+
+    text-align: right;
+
+    color: #40ff9d;
+}
+
+@media (max-width: 900px) {
+
+    .hud-power-item {
+        min-width: 125px;
+    }
+
+    .hud-power-slider {
+        width: 74px;
+    }
+
+}
+
+@media (max-width: 600px) {
+
+    .hud-power-item {
+        min-width: 104px;
+    }
+
+    .hud-power-slider {
+        width: 58px;
+    }
+
+    .hud-power-value {
+        min-width: 34px;
+
+        font-size: 0.66rem;
+    }
+
+}
+
+
 /* ===
    EXPLOSIÓN FINAL POR TIEMPO AGOTADO
 === */
