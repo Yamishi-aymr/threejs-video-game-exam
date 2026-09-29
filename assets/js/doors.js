@@ -4,6 +4,8 @@ import * as THREE from 'three';
 // ============================================================
 // PUERTAS DEL ESCENARIO
 // ============================================================
+
+
 const passageDoorPatterns = [
 
     // --------------------------------------------------------
@@ -81,10 +83,63 @@ const passageDoorPatterns = [
 
 
 // ============================================================
+// PIEZAS ADICIONALES DE LAS PUERTAS TRANSITABLES
+// ============================================================
+//
+// Algunas puertas están divididas en varias mallas.
+//
+// Ejemplo:
+//
+// Laboratory_Gate
+// Laboratory_Gate_Frame_Window
+// Laboratory_Gate_Frame_Window_Glass
+//
+// Si quitamos solamente la puerta, la ventana puede seguir
+// teniendo colisión.
+//
+// ============================================================
+
+const passageDoorAccessoryPatterns = [
+
+    // --------------------------------------------------------
+    // VENTANAS DEL PORTÓN DEL LABORATORIO
+    // --------------------------------------------------------
+
+    /^Laboratory_Gate_Frame_Window/,
+
+    /^Laboratory_Gate_Frame_Window_Glass/,
+
+
+    // --------------------------------------------------------
+    // VIDRIOS DE LAS PUERTAS INDUSTRIALES
+    // --------------------------------------------------------
+
+    /^IndustrialDoubleDoor_[LR]_Glass_Garage_/,
+
+
+    // --------------------------------------------------------
+    // VIDRIOS DE LAS PUERTAS DE COCINA
+    // --------------------------------------------------------
+
+    /^Kitchen_DoorL_Glass/,
+
+    /^Kitchen_DoorR_Glass/
+
+];
+
+
+// ============================================================
 // PUERTAS ENCONTRADAS
 // ============================================================
 
 const passageDoors = [];
+
+
+// ============================================================
+// PIEZAS DE PUERTAS OCULTADAS
+// ============================================================
+
+const passageDoorAccessories = [];
 
 
 // ============================================================
@@ -94,6 +149,11 @@ const passageDoors = [];
 const doorDebugCandidates = [];
 
 let lastDetectedDoor = null;
+
+
+// ============================================================
+// VECTOR TEMPORAL
+// ============================================================
 
 const doorWorldPosition =
     new THREE.Vector3();
@@ -118,6 +178,63 @@ export function isPassageDoorMesh(
 
 
 // ============================================================
+// COMPROBAR SI ES UNA PIEZA DE UNA PUERTA TRANSITABLE
+// ============================================================
+
+export function isPassageDoorAccessory(
+    objectName = ''
+) {
+
+    return passageDoorAccessoryPatterns.some(
+        (pattern) =>
+            pattern.test(
+                objectName
+            )
+    );
+
+}
+
+
+// ============================================================
+// GUARDAR VISIBILIDAD ORIGINAL
+// ============================================================
+
+function saveOriginalVisibility(
+    object
+) {
+
+    if (
+        object.userData.originalVisible === undefined
+    ) {
+
+        object.userData.originalVisible =
+            object.visible;
+
+    }
+
+}
+
+
+// ============================================================
+// OCULTAR OBJETO
+// ============================================================
+
+function hideObject(
+    object
+) {
+
+    saveOriginalVisibility(
+        object
+    );
+
+
+    object.visible =
+        false;
+
+}
+
+
+// ============================================================
 // PREPARAR PUERTAS PARA EXPLORACIÓN
 // ============================================================
 
@@ -127,12 +244,20 @@ export function prepareDoorsForExploration(
 
     passageDoors.length = 0;
 
+    passageDoorAccessories.length = 0;
+
     doorDebugCandidates.length = 0;
+
+    lastDetectedDoor = null;
 
 
     if (
         !environment
     ) {
+
+        console.warn(
+            '⚠️ No se recibió el escenario para preparar las puertas.'
+        );
 
         return;
 
@@ -141,6 +266,10 @@ export function prepareDoorsForExploration(
 
     environment.traverse(
         (object) => {
+
+            // ------------------------------------------------
+            // SOLAMENTE NOS INTERESAN MALLAS
+            // ------------------------------------------------
 
             if (
                 !object.isMesh
@@ -151,13 +280,17 @@ export function prepareDoorsForExploration(
             }
 
 
+            const objectName =
+                object.name || '';
+
+
+            const objectNameLower =
+                objectName.toLowerCase();
+
+
             // =================================================
             // REGISTRAR POSIBLES PUERTAS PARA DEPURACIÓN
             // =================================================
-
-            const objectNameLower =
-                object.name.toLowerCase();
-
 
             if (
                 objectNameLower.includes('door') ||
@@ -174,23 +307,66 @@ export function prepareDoorsForExploration(
 
 
             // =================================================
+            // OCULTAR PIEZAS ADICIONALES DE PUERTAS
+            // =================================================
+            //
+            // Aquí entran, por ejemplo, los vidrios circulares
+            // que seguían bloqueando al personaje.
+            //
+            // =================================================
+
+            if (
+                isPassageDoorAccessory(
+                    objectName
+                )
+            ) {
+
+                hideObject(
+                    object
+                );
+
+
+                passageDoorAccessories.push(
+                    object
+                );
+
+
+                console.log(
+                    '🪟 Pieza de puerta eliminada:',
+                    objectName
+                );
+
+
+                return;
+
+            }
+
+
+            // =================================================
             // OCULTAR PUERTAS DE PASO
             // =================================================
 
             if (
                 isPassageDoorMesh(
-                    object.name
+                    objectName
                 )
             ) {
 
-                object.userData.originalVisible =
-                    object.visible;
+                hideObject(
+                    object
+                );
 
-                object.visible = false;
 
                 passageDoors.push(
                     object
                 );
+
+
+                console.log(
+                    '🚪 Puerta abierta para exploración:',
+                    objectName
+                );
+
 
                 return;
 
@@ -200,20 +376,36 @@ export function prepareDoorsForExploration(
             // =================================================
             // OCULTAR ELEMENTOS DE SALIDA DE EMERGENCIA
             // =================================================
+            //
+            // Algunos letreros/botones están construidos como
+            // mallas y Rapier puede considerarlos obstáculos.
+            //
+            // =================================================
 
             if (
-                object.name.includes(
+                objectName.includes(
                     'ExitDoorSign'
                 ) ||
-                object.name.includes(
+                objectName.includes(
                     'Button_Exit'
                 )
             ) {
 
-                object.userData.originalVisible =
-                    object.visible;
+                hideObject(
+                    object
+                );
 
-                object.visible = false;
+
+                passageDoorAccessories.push(
+                    object
+                );
+
+
+                console.log(
+                    '🟢 Elemento de salida eliminado:',
+                    objectName
+                );
+
 
                 return;
 
@@ -223,15 +415,39 @@ export function prepareDoorsForExploration(
     );
 
 
+    // ========================================================
+    // RESUMEN
+    // ========================================================
+
     console.log(
-        '🚪 Puertas transitables preparadas:',
+        '=============================================='
+    );
+
+    console.log(
+        '🚪 PUERTAS DEL ESCENARIO'
+    );
+
+
+    console.log(
+        '🚪 Puertas transitables ocultadas:',
         passageDoors.length
+    );
+
+
+    console.log(
+        '🪟 Accesorios de puertas ocultados:',
+        passageDoorAccessories.length
     );
 
 
     console.log(
         '🔎 Objetos relacionados con puertas:',
         doorDebugCandidates.length
+    );
+
+
+    console.log(
+        '=============================================='
     );
 
 }
@@ -244,6 +460,17 @@ export function prepareDoorsForExploration(
 export function getPassageDoors() {
 
     return passageDoors;
+
+}
+
+
+// ============================================================
+// OBTENER ACCESORIOS
+// ============================================================
+
+export function getPassageDoorAccessories() {
+
+    return passageDoorAccessories;
 
 }
 
@@ -262,6 +489,22 @@ export function restorePassageDoors() {
                 true;
 
         }
+    );
+
+
+    passageDoorAccessories.forEach(
+        (accessory) => {
+
+            accessory.visible =
+                accessory.userData.originalVisible ??
+                true;
+
+        }
+    );
+
+
+    console.log(
+        '🔄 Puertas y accesorios restaurados.'
     );
 
 }
@@ -291,6 +534,10 @@ export function debugNearestDoor(
     let nearestDistance =
         Infinity;
 
+
+    // ========================================================
+    // BUSCAR OBJETO RELACIONADO CON PUERTA MÁS CERCANO
+    // ========================================================
 
     doorDebugCandidates.forEach(
         (door) => {
@@ -332,28 +579,81 @@ export function debugNearestDoor(
         nearestDistance <= maxDistance
     ) {
 
+        // ----------------------------------------------------
+        // EVITAR IMPRIMIR LO MISMO 60 VECES POR SEGUNDO
+        // ----------------------------------------------------
+
         if (
             lastDetectedDoor !==
             nearestDoor
         ) {
 
             console.log(
-                '🚪 PUERTA CERCANA'
+                '=============================================='
             );
+
+            console.log(
+                '🚪 PUERTA / ELEMENTO CERCANO'
+            );
+
 
             console.log(
                 'Nombre:',
                 nearestDoor.name
             );
 
+
             console.log(
                 'Distancia:',
                 `${nearestDistance.toFixed(2)} m`
             );
 
+
             console.log(
                 'Visible:',
                 nearestDoor.visible
+            );
+
+
+            console.log(
+                'Posición:',
+                {
+                    x:
+                        Number(
+                            doorWorldPosition.x.toFixed(2)
+                        ),
+
+                    y:
+                        Number(
+                            doorWorldPosition.y.toFixed(2)
+                        ),
+
+                    z:
+                        Number(
+                            doorWorldPosition.z.toFixed(2)
+                        )
+                }
+            );
+
+
+            console.log(
+                '¿Es puerta transitable?:',
+                isPassageDoorMesh(
+                    nearestDoor.name
+                )
+            );
+
+
+            console.log(
+                '¿Es accesorio de puerta?:',
+                isPassageDoorAccessory(
+                    nearestDoor.name
+                )
+            );
+
+
+            console.log(
+                '=============================================='
             );
 
 
@@ -366,7 +666,7 @@ export function debugNearestDoor(
 
 
     // ========================================================
-    // NOS ALEJAMOS
+    // NOS ALEJAMOS DE LA PUERTA
     // ========================================================
 
     else {

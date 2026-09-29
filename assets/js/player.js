@@ -19,7 +19,26 @@ let currentAction = null;
 let actionLocked = false;
 
 
+// ============================================================
+// EVENTO DE LANZAMIENTO
+// ============================================================
+
+let throwReleaseCallback =
+    null;
+
+let throwElapsed =
+    0;
+
+let throwReleased =
+    false;
+
+
+// Momento de la animación en el que sale el proyectil.
+const THROW_RELEASE_TIME =
+    0.55;
+
 const actions = {};
+
 
 
 
@@ -212,22 +231,11 @@ function makeClipInPlace(
                         i < values.length;
                         i += 3
                     ) {
-
-                        /*
-                        Conservamos Y porque contiene
-                        movimiento vertical natural.
-
-                        Bloqueamos X y Z porque el
-                        desplazamiento real lo controlará
-                        JavaScript.
-                        */
-
                         values[i] =
                             initialX;
 
                         values[i + 2] =
                             initialZ;
-
                     }
 
                 }
@@ -268,9 +276,9 @@ export function loadPlayer(
                 './assets/models/character/character_animated.glb',
 
 
-                // ====================================================
+
                 // PERSONAJE CARGADO
-                // ====================================================
+
 
                 (gltf) => {
 
@@ -427,9 +435,9 @@ export function loadPlayer(
                 },
 
 
-                // ====================================================
+
                 // PROGRESO
-                // ====================================================
+
 
                 (xhr) => {
 
@@ -452,9 +460,9 @@ export function loadPlayer(
                 },
 
 
-                // ====================================================
+
                 // ERROR
-                // ====================================================
+
 
                 (error) => {
 
@@ -537,6 +545,20 @@ export function playAnimation(
 
 }
 
+// ============================================================
+// REGISTRAR FUNCIÓN QUE SE EJECUTA AL LANZAR
+// ============================================================
+
+export function setThrowReleaseCallback(
+    callback
+) {
+
+    throwReleaseCallback =
+        typeof callback === 'function'
+            ? callback
+            : null;
+
+}
 
 // ANIMACIÓN DE LANZAMIENTO
 
@@ -556,6 +578,14 @@ export function triggerThrow() {
 
 
     actionLocked = true;
+
+
+    // Reiniciar control del proyectil
+    throwElapsed =
+        0;
+
+    throwReleased =
+        false;
 
 
     if (
@@ -620,7 +650,41 @@ export function updatePlayer(
         return player;
 
     }
+    // ========================================================
+    // MOMENTO DE LIBERAR EL PROYECTIL
+    // ========================================================
 
+    if (
+        actionLocked &&
+        currentAction === actions.Throw
+    ) {
+
+        throwElapsed +=
+            deltaTime;
+
+
+        if (
+            !throwReleased &&
+            throwElapsed >= THROW_RELEASE_TIME
+        ) {
+
+            throwReleased =
+                true;
+
+
+            if (
+                throwReleaseCallback
+            ) {
+
+                throwReleaseCallback(
+                    player
+                );
+
+            }
+
+        }
+
+    }
     // ACCIÓN TEMPORAL BLOQUEADA
 
 
@@ -815,9 +879,9 @@ export function updatePlayer(
             'Idle'
         );
     }
-    // ========================================================
+
     // MOVIMIENTO CONTROLADO POR RAPIER
-    // ========================================================
+
 
     const horizontalMovement =
         new THREE.Vector3();
